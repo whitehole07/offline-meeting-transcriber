@@ -5,7 +5,7 @@ import numpy as np
 import librosa
 from faster_whisper import WhisperModel
 from pyannote.audio import Pipeline
-from config import RECORDING_FILE, TRANSCRIPTION_FILE, DIARIZED_FILE, SAMPLE_RATE, WHISPER_MODEL, WHISPER_LANGUAGE, WHISPER_MODEL_PATH, DIARIZATION_MODEL_PATH
+from config import RECORDING_FILE, TRANSCRIPTION_FILE, DIARIZED_FILE, SAMPLE_RATE, WHISPER_MODEL, WHISPER_LANGUAGE, WHISPER_MODEL_PATH, DIARIZATION_MODEL_PATH, HF_TOKEN
 
 class MeetingTranscriber:
     def __init__(self):
@@ -17,8 +17,7 @@ class MeetingTranscriber:
         if self.whisper_model is None:
             try:
                 print(f"Loading Whisper model ({WHISPER_MODEL})...")
-                # self.whisper_model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
-                self.whisper_model = WhisperModel(WHISPER_MODEL_PATH, device="cpu", compute_type="int8")
+                self.whisper_model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
                 print("Whisper model loaded successfully")
             except Exception as e:
                 print(f"Error loading Whisper model: {e}")
@@ -114,7 +113,9 @@ class MeetingTranscriber:
             # Initialize diarization pipeline
             if not hasattr(self, 'diarization_pipeline') or self.diarization_pipeline is None:
                 print("Loading diarization model...")
-                self.diarization_pipeline = Pipeline.from_pretrained(DIARIZATION_MODEL_PATH)
+                self.diarization_pipeline = Pipeline.from_pretrained(
+                    "pyannote/speaker-diarization-3.1",
+                    use_auth_token=HF_TOKEN)
 
             # Perform diarization
             print("Performing speaker diarization...")

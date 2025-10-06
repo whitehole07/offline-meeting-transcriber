@@ -1,6 +1,10 @@
 import os
 from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Project paths
 PROJECT_ROOT = Path(__file__).parent
@@ -18,12 +22,13 @@ RECORDING_FORMAT = "wav"
 # Whisper settings
 WHISPER_MODEL = "medium"  # base, small, medium, large
 WHISPER_LANGUAGE = "it"
-WHISPER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "models--Systran--faster-whisper-medium", "snapshots", "08e178d48790749d25932bbc082711ddcfdfbc4f")
 
 # Diarization settings
-DIARIZATION_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "models--pyannote--speaker-diarization-3.1", "snapshots", "84fd25912480287da0247647c3d2b4853cb3ee5d")
 DIARIZATION_MIN_SPEAKERS = 1
 DIARIZATION_MAX_SPEAKERS = 10
+
+# Hugging Face token for accessing gated models
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Create output directory
 OUTPUT_DIR.mkdir(exist_ok=True)
