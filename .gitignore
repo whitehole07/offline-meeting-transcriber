@@ -1,0 +1,10 @@
+venv/
+output/
+models/
+__pycache__/
+.DS_Store
+.env
+.venv
+.pytest_cache/
+.ruff_cache/
+.vscode/
