@@ -54,12 +54,12 @@ class AudioRecorder:
         """Check if system audio recording is available"""
         try:
             if sys.platform == "win32":
-                # Windows: Check for WASAPI
-                result = subprocess.run(["ffmpeg", "-f", "wasapi", "-list_devices", "true", "-i", "dummy"], 
+                # Windows: Check for DirectShow
+                result = subprocess.run(["ffmpeg", "-f", "dshow", "-list_devices", "true", "-i", 'audio="Stereo Mix (Realtek(R) Audio)"'], 
                                      capture_output=True, text=True, timeout=10)
                 if result.returncode != 0:
                     print("Warning: System audio not available on Windows")
-                    print("Make sure you have audio drivers installed and FFmpeg supports WASAPI")
+                    print("Make sure you have audio drivers installed and FFmpeg supports DirectShow")
             else:
                 # Linux: Check for PulseAudio
                 result = subprocess.run(["pactl", "list", "sources", "short"], 
@@ -81,9 +81,9 @@ class AudioRecorder:
         """Start system audio recording using platform-specific methods"""
         try:
             if sys.platform == "win32":
-                # Windows: Use ffmpeg with wasapi
+                # Windows: Use ffmpeg with dshow
                 cmd = [
-                    "ffmpeg", "-f", "wasapi", "-i", "0",  # Default system audio device
+                    "ffmpeg", "-f", "dshow", "-i", 'audio="Stereo Mix (Realtek(R) Audio)"',  # Default system audio device
                     "-ar", str(SAMPLE_RATE),
                     "-ac", "1",  # Mono
                     "-y", str(self.system_audio_file)
