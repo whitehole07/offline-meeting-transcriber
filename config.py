@@ -31,4 +31,4 @@ DIARIZATION_MAX_SPEAKERS = 10
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Create output directory
-OUTPUT_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

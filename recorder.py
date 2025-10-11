@@ -83,9 +83,10 @@ class AudioRecorder:
             if sys.platform == "win32":
                 # Windows: Use ffmpeg with dshow
                 cmd = [
-                    "ffmpeg", "-f", "dshow", "-i", 'audio="Stereo Mix (Realtek(R) Audio)"',  # Default system audio device
+                    "ffmpeg", "-f", "dshow",
+                    "-i", "audio=Stereo Mix (Realtek(R) Audio)",
                     "-ar", str(SAMPLE_RATE),
-                    "-ac", "1",  # Mono
+                    "-ac", "1",
                     "-y", str(self.system_audio_file)
                 ]
             else:
