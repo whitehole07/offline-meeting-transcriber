@@ -330,14 +330,44 @@ class AudioRecorder:
             mic_audio = np.concatenate(self.mic_audio_data, axis=0)
             sys_audio = np.concatenate(self.sys_audio_data, axis=0)
             
-            # Flatten to mono if multi-channel
+            print(f"  Mic shape before: {mic_audio.shape}, channels: {self.mic_channels}")
+            print(f"  Sys shape before: {sys_audio.shape}, channels: {self.sys_channels}")
+            
+            # Convert to 1D mono arrays (flatten multi-channel data)
             if len(mic_audio.shape) > 1:
-                mic_audio = mic_audio.mean(axis=1).astype(np.int16)
+                if mic_audio.shape[1] == 2:
+                    # Stereo: average the two channels
+                    print(f"  Converting mic from stereo to mono")
+                    mic_audio = mic_audio.mean(axis=1).astype(np.int16)
+                elif mic_audio.shape[1] == 1:
+                    # Already mono but 2D: flatten it
+                    print(f"  Flattening mic audio")
+                    mic_audio = mic_audio.flatten()
+            elif self.mic_channels == 2:
+                # 1D interleaved stereo [L, R, L, R, ...] - reshape and average
+                print(f"  Deinterleaving mic stereo to mono")
+                mic_audio = mic_audio.reshape(-1, 2).mean(axis=1).astype(np.int16)
+            
             if len(sys_audio.shape) > 1:
-                sys_audio = sys_audio.mean(axis=1).astype(np.int16)
+                if sys_audio.shape[1] == 2:
+                    # Stereo: average the two channels
+                    print(f"  Converting sys from stereo to mono")
+                    sys_audio = sys_audio.mean(axis=1).astype(np.int16)
+                elif sys_audio.shape[1] == 1:
+                    # Already mono but 2D: flatten it
+                    print(f"  Flattening sys audio")
+                    sys_audio = sys_audio.flatten()
+            elif self.sys_channels == 2:
+                # 1D interleaved stereo [L, R, L, R, ...] - reshape and average
+                print(f"  Deinterleaving sys stereo to mono")
+                sys_audio = sys_audio.reshape(-1, 2).mean(axis=1).astype(np.int16)
+            
+            print(f"  Mic shape after: {mic_audio.shape}")
+            print(f"  Sys shape after: {sys_audio.shape}")
             
             # Resample to match sample rates if needed
             if self.mic_sample_rate != self.sys_sample_rate:
+                print(f"  Resampling mic: {self.mic_sample_rate} Hz -> {self.sys_sample_rate} Hz")
                 # Resample mic to match system audio
                 mic_audio_float = mic_audio.astype(np.float32) / 32768.0
                 mic_audio = librosa.resample(
@@ -350,14 +380,19 @@ class AudioRecorder:
             # Make sure both arrays are the same length (pad shorter one with zeros)
             max_len = max(len(mic_audio), len(sys_audio))
             if len(mic_audio) < max_len:
+                print(f"  Padding mic: {len(mic_audio)} -> {max_len}")
                 mic_audio = np.pad(mic_audio, (0, max_len - len(mic_audio)))
             if len(sys_audio) < max_len:
+                print(f"  Padding sys: {len(sys_audio)} -> {max_len}")
                 sys_audio = np.pad(sys_audio, (0, max_len - len(sys_audio)))
             
             # Simple mixing - convert to float for mixing, then back to int16
+            print(f"  Mixing audio (50/50 blend)")
             mic_float = mic_audio.astype(np.float32)
             sys_float = sys_audio.astype(np.float32)
             combined = ((mic_float + sys_float) / 2).astype(np.int16)
+            
+            print(f"  Final combined shape: {combined.shape}")
             
             # Save combined audio at system audio sample rate (mono after mixing)
             self._save_audio_int16(combined, RECORDING_FILE, self.sys_sample_rate, channels=1)
