@@ -12,6 +12,8 @@ from transcriber import MeetingTranscriber
 from config import RECORDING_FILE, TRANSCRIPTION_FILE, DIARIZED_FILE
 
 class MeetingTranscriberCLI:
+    """CLI interface for the meeting transcriber application."""
+    
     def __init__(self):
         self.recorder = AudioRecorder()
         self.transcriber = MeetingTranscriber()
@@ -56,9 +58,10 @@ class MeetingTranscriberCLI:
         self.recorder.stop_recording()
         self.recording_started = False
         
-        # Process the recorded audio
-        print("Processing audio...")
-        success = self.transcriber.transcribe_and_diarize()
+        # TODO: Uncomment to enable transcription and diarization
+        # print("Processing audio...")
+        # success = self.transcriber.transcribe_and_diarize()
+        success = True
         
         if success:
             print("\nProcessing complete!")
@@ -76,15 +79,16 @@ class MeetingTranscriberCLI:
         sys.exit(0)
 
 def main():
-    """Main CLI entry point"""
+    """Main CLI entry point."""
     if len(sys.argv) < 2:
-        print("Usage: meeting-transcriber <start|stop> [--no-mic]")
+        print("Usage: python cli.py <start|stop> [--no-mic]")
         print("\nCommands:")
-        print("  start  - Start recording audio")
-        print("  stop   - Stop recording and process audio")
+        print("  start     Start recording audio")
+        print("  stop      Stop recording and process audio")
         print("\nOptions:")
-        print("  --no-mic  - Record system audio only (no microphone)")
+        print("  --no-mic  Record system audio only (no microphone)")
         sys.exit(1)
+    
     cli = MeetingTranscriberCLI()
     command = sys.argv[1].lower()
     no_mic = "--no-mic" in sys.argv

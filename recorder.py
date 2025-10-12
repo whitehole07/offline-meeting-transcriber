@@ -1,22 +1,41 @@
-import sounddevice as sd
-import pyaudiowpatch as pyaudio
-import numpy as np
-import wave
 import sys
-from config import CHUNK_SIZE, RECORDING_FILE, OUTPUT_DIR
+import time
+import wave
+import numpy as np
+import sounddevice as sd
+import librosa
+from config import CHUNK_SIZE, RECORDING_FILE
+
+# Platform-specific imports
+# Windows: Use pyaudiowpatch for WASAPI loopback support
+# Linux: Use sounddevice for PulseAudio/PipeWire support
+if sys.platform == "win32":
+    try:
+        import pyaudiowpatch as pyaudio
+    except ImportError:
+        print("Warning: pyaudiowpatch not found. Install it for better Windows audio support:")
+        print("  pip install pyaudiowpatch")
+        pyaudio = None
+else:
+    pyaudio = None  # Not used on Linux
 
 class AudioRecorder:
+    """Cross-platform audio recorder for meetings with system and microphone audio capture."""
+    
     def __init__(self):
-        self.pa = pyaudio.PyAudio()
+        # Platform-specific audio backend
+        self.pa = pyaudio.PyAudio() if sys.platform == "win32" and pyaudio else None
+        
+        # Recording state
         self.is_recording = False
         self.sys_audio_data = []
         self.mic_audio_data = []
         self.sys_stream = None
         self.mic_stream = None
-
-        # maybe deprecated
-        self.system_audio_process = None
-        self.system_audio_file = OUTPUT_DIR / "system_audio.wav"
+        
+        # Sample rates (default values)
+        self.sys_sample_rate = 48000  # System audio sample rate
+        self.mic_sample_rate = 16000  # Microphone sample rate
         
     def start_recording(self, no_mic=False):
         """Start recording microphone and/or system audio"""
@@ -59,46 +78,122 @@ class AudioRecorder:
                         print("Warning: System audio loopback not available on Windows")
                         print("Make sure you have audio drivers installed and WASAPI-enabled Windows version")
             else:
-                # Linux: Check for PulseAudio
-                raise RuntimeError("Linux compatibility not yet available")
+                # Linux: Check for available input devices (Speaker/default/pipewire)
+                devices = sd.query_devices()
+                found_device = False
+                for dev in devices:
+                    name_lower = dev['name'].lower()
+                    if dev['max_input_channels'] > 0 and ('speaker' in name_lower or 'default' in name_lower or 'pipewire' in name_lower):
+                        found_device = True
+                        print(f"Found system audio device: {dev['name']}")
+                        break
+                if not found_device:
+                    print("Warning: No suitable audio input device found")
+                    print("Make sure PulseAudio/PipeWire is running")
         except Exception as e:
             print(f"Warning: Could not check system audio: {e}")
     
-    def _sys_audio_callback(self, indata, frames, time, status):
-        """Callback for system audio"""
+    def _sys_audio_callback_pyaudio(self, indata, frame_count, time_info, status):
+        """Callback for system audio (PyAudio on Windows)"""
         if self.is_recording:
+            # PyAudio returns bytes, convert to numpy array
+            if isinstance(indata, bytes):
+                audio_array = np.frombuffer(indata, dtype=np.int16)
+                self.sys_audio_data.append(audio_array)
+            else:
+                self.sys_audio_data.append(indata.copy())
+        return (indata, pyaudio.paContinue)
+    
+    def _sys_audio_callback_sd(self, indata, frames, time, status):
+        """Callback for system audio (sounddevice on Linux)"""
+        if status:
+            print(f"System audio status: {status}")
+        if self.is_recording:
+            # sounddevice returns numpy array directly
             self.sys_audio_data.append(indata.copy())
     
-    def _mic_audio_callback(self, indata, frames, time, status):
-        """Callback for microphone audio"""
+    def _mic_audio_callback_pyaudio(self, indata, frame_count, time_info, status):
+        """Callback for microphone audio (PyAudio on Windows)"""
         if self.is_recording:
+            # PyAudio returns bytes, convert to numpy array
+            if isinstance(indata, bytes):
+                audio_array = np.frombuffer(indata, dtype=np.int16)
+                self.mic_audio_data.append(audio_array)
+            else:
+                self.mic_audio_data.append(indata.copy())
+        return (indata, pyaudio.paContinue)
+    
+    def _mic_audio_callback_sd(self, indata, frames, time, status):
+        """Callback for microphone audio (sounddevice on Linux)"""
+        if status:
+            print(f"Microphone audio status: {status}")
+        if self.is_recording:
+            # sounddevice returns numpy array directly
             self.mic_audio_data.append(indata.copy())
             
     def _start_system_audio(self):
         """Start system audio recording using cross-platform methods"""
         try:
             if sys.platform == "win32":
+                # Windows: Use PyAudio with WASAPI loopback
                 lb = self.pa.get_default_wasapi_loopback()
                 rate = int(lb["defaultSampleRate"])
                 channels = max(1, int(lb["maxInputChannels"]))
+                input_index = lb["index"]
                 
                 self.sys_stream = self.pa.open(
-                    format=pyaudio.paInt16, 
-                    channels=channels, 
+                    format=pyaudio.paInt16,
+                    channels=channels,
                     rate=rate,
                     input=True,
-                    input_device_index=lb["index"],
+                    input_device_index=input_index,
                     frames_per_buffer=CHUNK_SIZE,
-                    stream_callback=self.sys_audio_callback
+                    stream_callback=self._sys_audio_callback_pyaudio
                 )
-
                 self.sys_stream.start_stream()
-
-                # Give it a moment to start
-                import time
-                time.sleep(0.5)
             else:
-                raise RuntimeError("Linux compatibility not yet available")
+                # Linux: Use sounddevice with speaker device for loopback
+                # Note: Direct monitor devices aren't visible through ALSA API
+                # We'll use the Speaker device which PipeWire can loop back
+                devices = sd.query_devices()
+                system_device = None
+                system_index = None
+                
+                # Try to find Speaker device (which has input channels via PipeWire loopback)
+                for idx, dev in enumerate(devices):
+                    name_lower = dev['name'].lower()
+                    if dev['max_input_channels'] > 0 and 'speaker' in name_lower:
+                        system_device = dev
+                        system_index = idx
+                        print(f"Using system audio device: {dev['name']}")
+                        break
+                
+                # Fallback to default or pipewire device
+                if not system_device:
+                    for idx, dev in enumerate(devices):
+                        name_lower = dev['name'].lower()
+                        if dev['max_input_channels'] > 0 and ('default' in name_lower or 'pipewire' in name_lower):
+                            system_device = dev
+                            system_index = idx
+                            print(f"Using system audio device: {dev['name']}")
+                            break
+                
+                if not system_device:
+                    raise RuntimeError("No suitable audio device found for system audio recording")
+                
+                # Start sounddevice input stream
+                self.sys_stream = sd.InputStream(
+                    device=system_index,
+                    channels=min(2, system_device['max_input_channels']),
+                    samplerate=self.sys_sample_rate,
+                    dtype=np.int16,
+                    callback=self._sys_audio_callback_sd,
+                    blocksize=CHUNK_SIZE
+                )
+                self.sys_stream.start()
+                
+            # Give it a moment to start
+            time.sleep(0.5)
                 
         except Exception as e:
             print(f"Warning: Could not start system audio recording: {e}")
@@ -106,26 +201,33 @@ class AudioRecorder:
     def _start_mic_audio(self):
         """Start mic audio recording using cross-platform methods"""
         try:
-            # Use the default input device's native settings
-            dev = self.pa.get_default_input_device_info()
-            rate = int(dev["defaultSampleRate"])
-            # Prefer mono if available; fall back to 2 if needed
-            channels = max(1, int(dev["maxInputChannels"]))
-            
-            # Start stream
-            self.mic_stram = self.pa.open(
-                format=pyaudio.paInt16,
-                channels=channels,
-                rate=rate,
-                input=True,
-                frames_per_buffer=CHUNK_SIZE,
-                stream_callback=self.mic_audio_callback
-            )
-
-            self.mic_stream.start_stream()
+            if sys.platform == "win32":
+                # Windows: Use PyAudio
+                dev = self.pa.get_default_input_device_info()
+                rate = int(dev["defaultSampleRate"])
+                channels = max(1, int(dev["maxInputChannels"]))
+                
+                self.mic_stream = self.pa.open(
+                    format=pyaudio.paInt16,
+                    channels=channels,
+                    rate=rate,
+                    input=True,
+                    frames_per_buffer=CHUNK_SIZE,
+                    stream_callback=self._mic_audio_callback_pyaudio
+                )
+                self.mic_stream.start_stream()
+            else:
+                # Linux: Use sounddevice
+                self.mic_stream = sd.InputStream(
+                    channels=1,  # Mono for mic
+                    samplerate=self.mic_sample_rate,
+                    dtype=np.int16,
+                    callback=self._mic_audio_callback_sd,
+                    blocksize=CHUNK_SIZE
+                )
+                self.mic_stream.start()
 
             # Give it a moment to start
-            import time
             time.sleep(0.5)
                 
         except Exception as e:
@@ -142,98 +244,113 @@ class AudioRecorder:
         
         # Stop microphone recording
         if self.mic_stream:
-            self.mic_stream.stop_stream()
-            self.mic_stream.close()
+            if sys.platform == "win32":
+                self.mic_stream.stop_stream()
+                self.mic_stream.close()
+            else:
+                self.mic_stream.stop()
+                self.mic_stream.close()
             
         # Stop system audio recording
         if self.sys_stream:
-            self.sys_stream.stop_stream()
-            self.sys_stream.close()
+            if sys.platform == "win32":
+                self.sys_stream.stop_stream()
+                self.sys_stream.close()
+            else:
+                self.sys_stream.stop()
+                self.sys_stream.close()
 
-        # giv eany last callback a moment to finish pushing frames
-        import time
+        # Give any last callback a moment to finish pushing frames
         time.sleep(0.05)
             
         # Handle audio saving based on what was recorded
-        self._combine_audio()
-
-        if self.audio_data and self.system_audio_file.exists():
-            # Both mic and system audio - combine them
-            mic_audio = np.concatenate(self.audio_data, axis=0)
-            self._save_audio(mic_audio, RECORDING_FILE)
-            print(f"Microphone audio saved to {RECORDING_FILE}")
-            self._combine_audio()
-            print(f"Combined audio saved to {RECORDING_FILE}")
-        elif self.audio_data:
-            # Only microphone audio
-            mic_audio = np.concatenate(self.audio_data, axis=0)
-            self._save_audio(mic_audio, RECORDING_FILE)
-            print(f"Microphone audio saved to {RECORDING_FILE}")
-        elif self.system_audio_file.exists():
-            # Only system audio - convert to final format
-            self._save_system_audio_only()
-            print(f"System audio saved to {RECORDING_FILE}")
-        else:
-            print("No audio was recorded!")
+        try:
+            if self.mic_audio_data and self.sys_audio_data:
+                # Both mic and system audio - combine them
+                print("Processing microphone and system audio...")
+                self._combine_audio()
+                print(f"Combined audio saved to {RECORDING_FILE}")
+            elif self.mic_audio_data:
+                # Only microphone audio
+                print("Processing microphone audio...")
+                mic_audio = np.concatenate(self.mic_audio_data, axis=0)
+                self._save_audio_int16(mic_audio, RECORDING_FILE, self.mic_sample_rate)
+                print(f"Microphone audio saved to {RECORDING_FILE}")
+            elif self.sys_audio_data:
+                # Only system audio
+                print("Processing system audio...")
+                sys_audio = np.concatenate(self.sys_audio_data, axis=0)
+                self._save_audio_int16(sys_audio, RECORDING_FILE, self.sys_sample_rate)
+                print(f"System audio saved to {RECORDING_FILE}")
+            else:
+                print("No audio was recorded!")
+        except Exception as e:
+            print(f"Error saving audio: {e}")
             
         print("Recording stopped.")
         
-    def _save_system_audio_only(self):
-        """Save system audio only (no microphone) with proper format conversion"""
-        try:
-            import librosa
-            
-            # Load system audio and convert to mono, 16kHz
-            system_audio, sr = librosa.load(str(self.system_audio_file), sr=SAMPLE_RATE, mono=True)
-            
-            # Save as final recording
-            self._save_audio(system_audio, RECORDING_FILE)
-            
-            # Clean up system audio file
-            self.system_audio_file.unlink()
-            
-        except Exception as e:
-            print(f"Warning: Could not process system audio: {e}")
-            # Fallback: just copy the system audio file
-            import shutil
-            shutil.copy2(self.system_audio_file, RECORDING_FILE)
-            self.system_audio_file.unlink()
+    def _save_audio_int16(self, audio_data, filename, sample_rate=None):
+        """Save audio data (already in int16 format) to WAV file"""
+        # audio_data is already in int16 format from PyAudio
+        # Use provided sample rate or default
+        if sample_rate is None:
+            sample_rate = 48000
         
-    def _save_audio(self, audio_data, filename):
-        """Save audio data to WAV file"""
-        # Convert to 16-bit PCM
-        audio_int16 = (audio_data * 32767).astype(np.int16)
+        # Flatten if multi-channel (convert to mono)
+        if len(audio_data.shape) > 1:
+            audio_data = audio_data.mean(axis=1).astype(np.int16)
         
         with wave.open(str(filename), 'wb') as wav_file:
             wav_file.setnchannels(1)  # Mono
             wav_file.setsampwidth(2)  # 16-bit
-            wav_file.setframerate(SAMPLE_RATE)
-            wav_file.writeframes(audio_int16.tobytes())
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(audio_data.tobytes())
             
     def _combine_audio(self):
         """Combine microphone and system audio"""
         try:
-            # Load mic audio
-            mic_audio = self._load_audio(RECORDING_FILE)
+            # Concatenate all mic and system audio chunks
+            mic_audio = np.concatenate(self.mic_audio_data, axis=0)
+            sys_audio = np.concatenate(self.sys_audio_data, axis=0)
             
-            # Load system audio
-            system_audio = self._load_audio(self.system_audio_file)
+            # Flatten to mono if multi-channel
+            if len(mic_audio.shape) > 1:
+                mic_audio = mic_audio.mean(axis=1).astype(np.int16)
+            if len(sys_audio.shape) > 1:
+                sys_audio = sys_audio.mean(axis=1).astype(np.int16)
             
-            # Simple mixing
-            combined_audio = (mic_audio + system_audio) / 2
+            # Resample to match sample rates if needed
+            if self.mic_sample_rate != self.sys_sample_rate:
+                # Resample mic to match system audio
+                mic_audio_float = mic_audio.astype(np.float32) / 32768.0
+                mic_audio = librosa.resample(
+                    mic_audio_float, 
+                    orig_sr=self.mic_sample_rate, 
+                    target_sr=self.sys_sample_rate
+                )
+                mic_audio = (mic_audio * 32767).astype(np.int16)
             
-            # Save combined audio
-            self._save_audio(combined_audio, RECORDING_FILE)
+            # Make sure both arrays are the same length (pad shorter one with zeros)
+            max_len = max(len(mic_audio), len(sys_audio))
+            if len(mic_audio) < max_len:
+                mic_audio = np.pad(mic_audio, (0, max_len - len(mic_audio)))
+            if len(sys_audio) < max_len:
+                sys_audio = np.pad(sys_audio, (0, max_len - len(sys_audio)))
             
-            # Clean up system audio file
-            self.system_audio_file.unlink()
+            # Simple mixing - convert to float for mixing, then back to int16
+            mic_float = mic_audio.astype(np.float32)
+            sys_float = sys_audio.astype(np.float32)
+            combined = ((mic_float + sys_float) / 2).astype(np.int16)
+            
+            # Save combined audio at system audio sample rate
+            self._save_audio_int16(combined, RECORDING_FILE, self.sys_sample_rate)
             
         except Exception as e:
             print(f"Warning: Could not combine audio: {e}")
-            
-    def _load_audio(self, filename):
-        """Load audio from WAV file"""
-        with wave.open(str(filename), 'rb') as wav_file:
-            frames = wav_file.readframes(wav_file.getnframes())
-            audio = np.frombuffer(frames, dtype=np.int16)
-            return audio.astype(np.float32) / 32767.0
+            # Fallback: save audios separately
+            if self.mic_audio_data:
+                mic_audio = np.concatenate(self.mic_audio_data, axis=0)
+                self._save_audio_int16(mic_audio, str(RECORDING_FILE).replace(".wav", "_mic.wav"), self.mic_sample_rate)
+            if self.sys_audio_data:
+                sys_audio = np.concatenate(self.sys_audio_data, axis=0)
+                self._save_audio_int16(sys_audio, str(RECORDING_FILE).replace(".wav", "_sys.wav"), self.sys_sample_rate)

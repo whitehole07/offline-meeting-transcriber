@@ -14,18 +14,21 @@ TRANSCRIPTION_FILE = OUTPUT_DIR / f"transcription_{datetime.now().strftime('%H%M
 DIARIZED_FILE = OUTPUT_DIR / f"diarized_{datetime.now().strftime('%H%M%S')}.json"
 
 # Audio settings
-CHUNK_SIZE = 1024
+SAMPLE_RATE = 16000  # Default sample rate for audio processing
+CHUNK_SIZE = 1024    # Buffer size for audio streaming
 RECORDING_FORMAT = "wav"
 
-# Whisper settings
-WHISPER_MODEL = "medium"  # base, small, medium, large
-WHISPER_LANGUAGE = "it"
+# Whisper transcription settings
+WHISPER_MODEL = "medium"     # Options: base, small, medium, large
+WHISPER_LANGUAGE = "it"      # Language code for transcription
+WHISPER_MODEL_PATH = None    # Optional: custom model path
+DIARIZATION_MODEL_PATH = None  # Optional: custom diarization model path
 
-# Diarization settings
+# Speaker diarization settings
 DIARIZATION_MIN_SPEAKERS = 1
 DIARIZATION_MAX_SPEAKERS = 10
 
-# Hugging Face token for accessing gated models
+# Hugging Face token for accessing gated models (e.g., pyannote)
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Create output directory
