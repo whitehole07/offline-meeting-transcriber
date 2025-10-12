@@ -39,6 +39,11 @@ class AudioRecorder:
         self.sys_channels = 1          # System audio channels
         self.mic_channels = 1          # Microphone channels
         
+        # Synchronization tracking
+        self.start_time = None         # Recording start timestamp
+        self.mic_start_time = None     # Mic stream start time
+        self.sys_start_time = None     # Sys stream start time
+        
     def start_recording(self, no_mic=False):
         """Start recording microphone and/or system audio"""
         if self.is_recording:
@@ -50,23 +55,27 @@ class AudioRecorder:
         else:
             print("Starting recording with microphone and system audio...")
             
-        self.is_recording = True
+        # Reset data BEFORE starting streams to ensure sync
         self.sys_audio_data, self.mic_audio_data = [], []
         
         # Check system audio availability
         self._check_system_audio()
         
-        # Start microphone recording (unless disabled)
+        # IMPORTANT: Set recording flag BEFORE starting streams
+        # This ensures callbacks start capturing immediately when streams begin
+        self.is_recording = True
+        
+        # Start both streams as close together as possible for better sync
         if not no_mic:
             self._start_mic_audio()
         else:
             self.mic_stream = None
             print("Microphone recording disabled")
         
-        # Start system audio recording
         self._start_system_audio()
         
         print("Recording started. Press Ctrl+C to stop.")
+        print("Note: Audio streams may have slight timing differences at start/end")
         
     def _check_system_audio(self):
         """Check if system audio recording is available"""
@@ -200,9 +209,6 @@ class AudioRecorder:
                 )
                 self.sys_stream.start()
                 
-            # Give it a moment to start
-            time.sleep(0.5)
-                
         except Exception as e:
             print(f"Warning: Could not start system audio recording: {e}")
 
@@ -239,9 +245,6 @@ class AudioRecorder:
                     blocksize=CHUNK_SIZE
                 )
                 self.mic_stream.start()
-
-            # Give it a moment to start
-            time.sleep(0.5)
                 
         except Exception as e:
             print(f"Warning: Could not start mic audio recording: {e}")
@@ -365,10 +368,15 @@ class AudioRecorder:
             print(f"  Mic shape after: {mic_audio.shape}")
             print(f"  Sys shape after: {sys_audio.shape}")
             
-            # Resample to match sample rates if needed
+            # Calculate actual recording durations
+            mic_duration = len(mic_audio) / self.mic_sample_rate
+            sys_duration = len(sys_audio) / self.sys_sample_rate
+            print(f"  Mic duration: {mic_duration:.2f}s")
+            print(f"  Sys duration: {sys_duration:.2f}s")
+            
+            # Resample mic to match system audio sample rate FIRST
             if self.mic_sample_rate != self.sys_sample_rate:
                 print(f"  Resampling mic: {self.mic_sample_rate} Hz -> {self.sys_sample_rate} Hz")
-                # Resample mic to match system audio
                 mic_audio_float = mic_audio.astype(np.float32) / 32768.0
                 mic_audio = librosa.resample(
                     mic_audio_float, 
@@ -376,15 +384,20 @@ class AudioRecorder:
                     target_sr=self.sys_sample_rate
                 )
                 mic_audio = (mic_audio * 32767).astype(np.int16)
+                print(f"  Mic shape after resampling: {mic_audio.shape}")
             
-            # Make sure both arrays are the same length (pad shorter one with zeros)
-            max_len = max(len(mic_audio), len(sys_audio))
-            if len(mic_audio) < max_len:
-                print(f"  Padding mic: {len(mic_audio)} -> {max_len}")
-                mic_audio = np.pad(mic_audio, (0, max_len - len(mic_audio)))
-            if len(sys_audio) < max_len:
-                print(f"  Padding sys: {len(sys_audio)} -> {max_len}")
-                sys_audio = np.pad(sys_audio, (0, max_len - len(sys_audio)))
+            # Now both are at the same sample rate - align by duration
+            # Use the shorter duration to avoid padding with silence
+            target_duration = min(mic_duration, sys_duration)
+            target_samples = int(target_duration * self.sys_sample_rate)
+            
+            print(f"  Target duration: {target_duration:.2f}s ({target_samples} samples)")
+            
+            # Trim both to the same length (use shorter duration)
+            mic_audio = mic_audio[:target_samples]
+            sys_audio = sys_audio[:target_samples]
+            
+            print(f"  Final aligned - Mic: {len(mic_audio)}, Sys: {len(sys_audio)}")
             
             # Simple mixing - convert to float for mixing, then back to int16
             print(f"  Mixing audio (50/50 blend)")
