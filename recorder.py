@@ -137,14 +137,16 @@ class AudioRecorder:
             if sys.platform == "win32":
                 # Windows: Use PyAudio with WASAPI loopback
                 lb = self.pa.get_default_wasapi_loopback()
-                rate = int(lb["defaultSampleRate"])
+                self.sys_sample_rate = int(lb["defaultSampleRate"])  # Store sample rate
                 channels = max(1, int(lb["maxInputChannels"]))
                 input_index = lb["index"]
+                
+                print(f"System audio: {self.sys_sample_rate} Hz, {channels} channel(s)")
                 
                 self.sys_stream = self.pa.open(
                     format=pyaudio.paInt16,
                     channels=channels,
-                    rate=rate,
+                    rate=self.sys_sample_rate,
                     input=True,
                     input_device_index=input_index,
                     frames_per_buffer=CHUNK_SIZE,
@@ -182,9 +184,13 @@ class AudioRecorder:
                     raise RuntimeError("No suitable audio device found for system audio recording")
                 
                 # Start sounddevice input stream
+                channels = min(2, system_device['max_input_channels'])
+                
+                print(f"System audio: {self.sys_sample_rate} Hz, {channels} channel(s)")
+                
                 self.sys_stream = sd.InputStream(
                     device=system_index,
-                    channels=min(2, system_device['max_input_channels']),
+                    channels=channels,
                     samplerate=self.sys_sample_rate,
                     dtype=np.int16,
                     callback=self._sys_audio_callback_sd,
@@ -204,13 +210,15 @@ class AudioRecorder:
             if sys.platform == "win32":
                 # Windows: Use PyAudio
                 dev = self.pa.get_default_input_device_info()
-                rate = int(dev["defaultSampleRate"])
+                self.mic_sample_rate = int(dev["defaultSampleRate"])  # Store sample rate
                 channels = max(1, int(dev["maxInputChannels"]))
+                
+                print(f"Microphone: {self.mic_sample_rate} Hz, {channels} channel(s)")
                 
                 self.mic_stream = self.pa.open(
                     format=pyaudio.paInt16,
                     channels=channels,
-                    rate=rate,
+                    rate=self.mic_sample_rate,
                     input=True,
                     frames_per_buffer=CHUNK_SIZE,
                     stream_callback=self._mic_audio_callback_pyaudio
@@ -218,6 +226,8 @@ class AudioRecorder:
                 self.mic_stream.start_stream()
             else:
                 # Linux: Use sounddevice
+                print(f"Microphone: {self.mic_sample_rate} Hz, 1 channel")
+                
                 self.mic_stream = sd.InputStream(
                     channels=1,  # Mono for mic
                     samplerate=self.mic_sample_rate,
@@ -270,18 +280,21 @@ class AudioRecorder:
                 print("Processing microphone and system audio...")
                 self._combine_audio()
                 print(f"Combined audio saved to {RECORDING_FILE}")
+                print(f"  Sample rate: {self.sys_sample_rate} Hz (system audio rate)")
             elif self.mic_audio_data:
                 # Only microphone audio
                 print("Processing microphone audio...")
                 mic_audio = np.concatenate(self.mic_audio_data, axis=0)
                 self._save_audio_int16(mic_audio, RECORDING_FILE, self.mic_sample_rate)
                 print(f"Microphone audio saved to {RECORDING_FILE}")
+                print(f"  Sample rate: {self.mic_sample_rate} Hz")
             elif self.sys_audio_data:
                 # Only system audio
                 print("Processing system audio...")
                 sys_audio = np.concatenate(self.sys_audio_data, axis=0)
                 self._save_audio_int16(sys_audio, RECORDING_FILE, self.sys_sample_rate)
                 print(f"System audio saved to {RECORDING_FILE}")
+                print(f"  Sample rate: {self.sys_sample_rate} Hz")
             else:
                 print("No audio was recorded!")
         except Exception as e:
@@ -289,12 +302,8 @@ class AudioRecorder:
             
         print("Recording stopped.")
         
-    def _save_audio_int16(self, audio_data, filename, sample_rate=None):
+    def _save_audio_int16(self, audio_data, filename, sample_rate=48000):
         """Save audio data (already in int16 format) to WAV file"""
-        # audio_data is already in int16 format from PyAudio
-        # Use provided sample rate or default
-        if sample_rate is None:
-            sample_rate = 48000
         
         # Flatten if multi-channel (convert to mono)
         if len(audio_data.shape) > 1:
