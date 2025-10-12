@@ -33,9 +33,11 @@ class AudioRecorder:
         self.sys_stream = None
         self.mic_stream = None
         
-        # Sample rates (default values)
+        # Audio format tracking
         self.sys_sample_rate = 48000  # System audio sample rate
         self.mic_sample_rate = 16000  # Microphone sample rate
+        self.sys_channels = 1          # System audio channels
+        self.mic_channels = 1          # Microphone channels
         
     def start_recording(self, no_mic=False):
         """Start recording microphone and/or system audio"""
@@ -137,15 +139,15 @@ class AudioRecorder:
             if sys.platform == "win32":
                 # Windows: Use PyAudio with WASAPI loopback
                 lb = self.pa.get_default_wasapi_loopback()
-                self.sys_sample_rate = int(lb["defaultSampleRate"])  # Store sample rate
-                channels = max(1, int(lb["maxInputChannels"]))
+                self.sys_sample_rate = int(lb["defaultSampleRate"])
+                self.sys_channels = max(1, int(lb["maxInputChannels"]))
                 input_index = lb["index"]
                 
-                print(f"System audio: {self.sys_sample_rate} Hz, {channels} channel(s)")
+                print(f"System audio: {self.sys_sample_rate} Hz, {self.sys_channels} channel(s)")
                 
                 self.sys_stream = self.pa.open(
                     format=pyaudio.paInt16,
-                    channels=channels,
+                    channels=self.sys_channels,
                     rate=self.sys_sample_rate,
                     input=True,
                     input_device_index=input_index,
@@ -184,13 +186,13 @@ class AudioRecorder:
                     raise RuntimeError("No suitable audio device found for system audio recording")
                 
                 # Start sounddevice input stream
-                channels = min(2, system_device['max_input_channels'])
+                self.sys_channels = min(2, system_device['max_input_channels'])
                 
-                print(f"System audio: {self.sys_sample_rate} Hz, {channels} channel(s)")
+                print(f"System audio: {self.sys_sample_rate} Hz, {self.sys_channels} channel(s)")
                 
                 self.sys_stream = sd.InputStream(
                     device=system_index,
-                    channels=channels,
+                    channels=self.sys_channels,
                     samplerate=self.sys_sample_rate,
                     dtype=np.int16,
                     callback=self._sys_audio_callback_sd,
@@ -210,14 +212,14 @@ class AudioRecorder:
             if sys.platform == "win32":
                 # Windows: Use PyAudio
                 dev = self.pa.get_default_input_device_info()
-                self.mic_sample_rate = int(dev["defaultSampleRate"])  # Store sample rate
-                channels = max(1, int(dev["maxInputChannels"]))
+                self.mic_sample_rate = int(dev["defaultSampleRate"])
+                self.mic_channels = max(1, int(dev["maxInputChannels"]))
                 
-                print(f"Microphone: {self.mic_sample_rate} Hz, {channels} channel(s)")
+                print(f"Microphone: {self.mic_sample_rate} Hz, {self.mic_channels} channel(s)")
                 
                 self.mic_stream = self.pa.open(
                     format=pyaudio.paInt16,
-                    channels=channels,
+                    channels=self.mic_channels,
                     rate=self.mic_sample_rate,
                     input=True,
                     frames_per_buffer=CHUNK_SIZE,
@@ -226,10 +228,11 @@ class AudioRecorder:
                 self.mic_stream.start_stream()
             else:
                 # Linux: Use sounddevice
-                print(f"Microphone: {self.mic_sample_rate} Hz, 1 channel")
+                self.mic_channels = 1  # Mono for mic
+                print(f"Microphone: {self.mic_sample_rate} Hz, {self.mic_channels} channel")
                 
                 self.mic_stream = sd.InputStream(
-                    channels=1,  # Mono for mic
+                    channels=self.mic_channels,
                     samplerate=self.mic_sample_rate,
                     dtype=np.int16,
                     callback=self._mic_audio_callback_sd,
@@ -285,16 +288,16 @@ class AudioRecorder:
                 # Only microphone audio
                 print("Processing microphone audio...")
                 mic_audio = np.concatenate(self.mic_audio_data, axis=0)
-                self._save_audio_int16(mic_audio, RECORDING_FILE, self.mic_sample_rate)
+                self._save_audio_int16(mic_audio, RECORDING_FILE, self.mic_sample_rate, self.mic_channels)
                 print(f"Microphone audio saved to {RECORDING_FILE}")
-                print(f"  Sample rate: {self.mic_sample_rate} Hz")
+                print(f"  Format: {self.mic_channels} channel(s), 16-bit, {self.mic_sample_rate} Hz")
             elif self.sys_audio_data:
                 # Only system audio
                 print("Processing system audio...")
                 sys_audio = np.concatenate(self.sys_audio_data, axis=0)
-                self._save_audio_int16(sys_audio, RECORDING_FILE, self.sys_sample_rate)
+                self._save_audio_int16(sys_audio, RECORDING_FILE, self.sys_sample_rate, self.sys_channels)
                 print(f"System audio saved to {RECORDING_FILE}")
-                print(f"  Sample rate: {self.sys_sample_rate} Hz")
+                print(f"  Format: {self.sys_channels} channel(s), 16-bit, {self.sys_sample_rate} Hz")
             else:
                 print("No audio was recorded!")
         except Exception as e:
@@ -302,15 +305,20 @@ class AudioRecorder:
             
         print("Recording stopped.")
         
-    def _save_audio_int16(self, audio_data, filename, sample_rate=48000):
+    def _save_audio_int16(self, audio_data, filename, sample_rate=48000, channels=1):
         """Save audio data (already in int16 format) to WAV file"""
         
-        # Flatten if multi-channel (convert to mono)
+        # Determine actual channel count from data shape
         if len(audio_data.shape) > 1:
-            audio_data = audio_data.mean(axis=1).astype(np.int16)
+            actual_channels = audio_data.shape[1]
+        else:
+            actual_channels = 1
+        
+        # Use provided channels or detected channels
+        output_channels = channels if channels > 0 else actual_channels
         
         with wave.open(str(filename), 'wb') as wav_file:
-            wav_file.setnchannels(1)  # Mono
+            wav_file.setnchannels(output_channels)
             wav_file.setsampwidth(2)  # 16-bit
             wav_file.setframerate(sample_rate)
             wav_file.writeframes(audio_data.tobytes())
@@ -351,15 +359,15 @@ class AudioRecorder:
             sys_float = sys_audio.astype(np.float32)
             combined = ((mic_float + sys_float) / 2).astype(np.int16)
             
-            # Save combined audio at system audio sample rate
-            self._save_audio_int16(combined, RECORDING_FILE, self.sys_sample_rate)
+            # Save combined audio at system audio sample rate (mono after mixing)
+            self._save_audio_int16(combined, RECORDING_FILE, self.sys_sample_rate, channels=1)
             
         except Exception as e:
             print(f"Warning: Could not combine audio: {e}")
             # Fallback: save audios separately
             if self.mic_audio_data:
                 mic_audio = np.concatenate(self.mic_audio_data, axis=0)
-                self._save_audio_int16(mic_audio, str(RECORDING_FILE).replace(".wav", "_mic.wav"), self.mic_sample_rate)
+                self._save_audio_int16(mic_audio, str(RECORDING_FILE).replace(".wav", "_mic.wav"), self.mic_sample_rate, self.mic_channels)
             if self.sys_audio_data:
                 sys_audio = np.concatenate(self.sys_audio_data, axis=0)
-                self._save_audio_int16(sys_audio, str(RECORDING_FILE).replace(".wav", "_sys.wav"), self.sys_sample_rate)
+                self._save_audio_int16(sys_audio, str(RECORDING_FILE).replace(".wav", "_sys.wav"), self.sys_sample_rate, self.sys_channels)
