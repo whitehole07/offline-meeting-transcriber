@@ -7,7 +7,6 @@ A lightweight tool for recording and transcribing meetings offline.
 import sys
 import signal
 import time
-from pathlib import Path
 from recorder import AudioRecorder
 from transcriber import MeetingTranscriber
 from config import RECORDING_FILE, TRANSCRIPTION_FILE, DIARIZED_FILE

@@ -1,17 +1,20 @@
 import sounddevice as sd
+import pyaudiowpatch as pyaudio
 import numpy as np
 import wave
-import threading
-import subprocess
 import sys
-from pathlib import Path
-from config import SAMPLE_RATE, CHANNELS, CHUNK_SIZE, RECORDING_FILE, OUTPUT_DIR
+from config import CHUNK_SIZE, RECORDING_FILE, OUTPUT_DIR
 
 class AudioRecorder:
     def __init__(self):
+        self.pa = pyaudio.PyAudio()
         self.is_recording = False
-        self.audio_data = []
+        self.sys_audio_data = []
+        self.mic_audio_data = []
+        self.sys_stream = None
         self.mic_stream = None
+
+        # maybe deprecated
         self.system_audio_process = None
         self.system_audio_file = OUTPUT_DIR / "system_audio.wav"
         
@@ -27,25 +30,19 @@ class AudioRecorder:
             print("Starting recording with microphone and system audio...")
             
         self.is_recording = True
-        self.audio_data = []
+        self.sys_audio_data, self.mic_audio_data = [], []
         
         # Check system audio availability
         self._check_system_audio()
         
         # Start microphone recording (unless disabled)
         if not no_mic:
-            self.mic_stream = sd.InputStream(
-                samplerate=SAMPLE_RATE,
-                channels=1,  # Mono for mic
-                dtype=np.float32,
-                callback=self._audio_callback
-            )
-            self.mic_stream.start()
+            self._start_mic_audio()
         else:
             self.mic_stream = None
             print("Microphone recording disabled")
         
-        # Start system audio recording (platform-specific)
+        # Start system audio recording
         self._start_system_audio()
         
         print("Recording started. Press Ctrl+C to stop.")
@@ -54,72 +51,85 @@ class AudioRecorder:
         """Check if system audio recording is available"""
         try:
             if sys.platform == "win32":
-                # Windows: Check for DirectShow
-                result = subprocess.run(["ffmpeg", "-f", "dshow", "-list_devices", "true", "-i", 'audio="Stereo Mix (Realtek(R) Audio)"'], 
-                                     capture_output=True, text=True, timeout=10)
-                if result.returncode != 0:
-                    print("Warning: System audio not available on Windows")
-                    print("Make sure you have audio drivers installed and FFmpeg supports DirectShow")
+                # Windows: Check for WASAPI loopbacks
+                with pyaudio.PyAudio() as pa:
+                    try:
+                        pa.get_default_wasapi_loopback()
+                    except Exception as e:
+                        print("Warning: System audio loopback not available on Windows")
+                        print("Make sure you have audio drivers installed and WASAPI-enabled Windows version")
             else:
                 # Linux: Check for PulseAudio
-                result = subprocess.run(["pactl", "list", "sources", "short"], 
-                                     capture_output=True, text=True, timeout=5)
-                if result.returncode != 0:
-                    print("Warning: PulseAudio not available")
-                    print("Install PulseAudio: sudo apt install pulseaudio")
-                else:
-                    print("System audio check passed")
+                raise RuntimeError("Linux compatibility not yet available")
         except Exception as e:
             print(f"Warning: Could not check system audio: {e}")
     
-    def _audio_callback(self, indata, frames, time, status):
+    def _sys_audio_callback(self, indata, frames, time, status):
+        """Callback for system audio"""
+        if self.is_recording:
+            self.sys_audio_data.append(indata.copy())
+    
+    def _mic_audio_callback(self, indata, frames, time, status):
         """Callback for microphone audio"""
         if self.is_recording:
-            self.audio_data.append(indata.copy())
+            self.mic_audio_data.append(indata.copy())
             
     def _start_system_audio(self):
-        """Start system audio recording using platform-specific methods"""
+        """Start system audio recording using cross-platform methods"""
         try:
             if sys.platform == "win32":
-                # Windows: Use ffmpeg with dshow
-                cmd = [
-                    "ffmpeg", "-f", "dshow",
-                    "-i", "audio=Stereo Mix (Realtek(R) Audio)",
-                    "-ar", str(SAMPLE_RATE),
-                    "-ac", "1",
-                    "-y", str(self.system_audio_file)
-                ]
+                lb = self.pa.get_default_wasapi_loopback()
+                rate = int(lb["defaultSampleRate"])
+                channels = max(1, int(lb["maxInputChannels"]))
+                
+                self.sys_stream = self.pa.open(
+                    format=pyaudio.paInt16, 
+                    channels=channels, 
+                    rate=rate,
+                    input=True,
+                    input_device_index=lb["index"],
+                    frames_per_buffer=CHUNK_SIZE,
+                    stream_callback=self.sys_audio_callback
+                )
+
+                self.sys_stream.start_stream()
+
+                # Give it a moment to start
+                import time
+                time.sleep(0.5)
             else:
-                # Linux: Use pulseaudio/pipewire with monitor source
-                cmd = [
-                    "ffmpeg", "-f", "pulse", "-i", "default.monitor",
-                    "-ar", str(SAMPLE_RATE),
-                    "-ac", "1",  # Mono
-                    "-y", str(self.system_audio_file)
-                ]
-            
-            # Skip the problematic test and try direct recording
-            
-            self.system_audio_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE
-            )
-            
-            # Give it a moment to start
-            import time
-            time.sleep(0.5)
-            
-            # Check if process is still running
-            if self.system_audio_process.poll() is not None:
-                stderr_output = self.system_audio_process.stderr.read().decode()
-                print(f"Warning: System audio recording failed: {stderr_output}")
-                print("Continuing with microphone only...")
-                self.system_audio_process = None
+                raise RuntimeError("Linux compatibility not yet available")
                 
         except Exception as e:
             print(f"Warning: Could not start system audio recording: {e}")
-            print("Continuing with microphone only...")
+
+    def _start_mic_audio(self):
+        """Start mic audio recording using cross-platform methods"""
+        try:
+            # Use the default input device's native settings
+            dev = self.pa.get_default_input_device_info()
+            rate = int(dev["defaultSampleRate"])
+            # Prefer mono if available; fall back to 2 if needed
+            channels = max(1, int(dev["maxInputChannels"]))
+            
+            # Start stream
+            self.mic_stram = self.pa.open(
+                format=pyaudio.paInt16,
+                channels=channels,
+                rate=rate,
+                input=True,
+                frames_per_buffer=CHUNK_SIZE,
+                stream_callback=self.mic_audio_callback
+            )
+
+            self.mic_stream.start_stream()
+
+            # Give it a moment to start
+            import time
+            time.sleep(0.5)
+                
+        except Exception as e:
+            print(f"Warning: Could not start mic audio recording: {e}")
             
     def stop_recording(self):
         """Stop recording and save audio"""
@@ -132,15 +142,21 @@ class AudioRecorder:
         
         # Stop microphone recording
         if self.mic_stream:
-            self.mic_stream.stop()
+            self.mic_stream.stop_stream()
             self.mic_stream.close()
             
         # Stop system audio recording
-        if self.system_audio_process:
-            self.system_audio_process.terminate()
-            self.system_audio_process.wait()
+        if self.sys_stream:
+            self.sys_stream.stop_stream()
+            self.sys_stream.close()
+
+        # giv eany last callback a moment to finish pushing frames
+        import time
+        time.sleep(0.05)
             
         # Handle audio saving based on what was recorded
+        self._combine_audio()
+
         if self.audio_data and self.system_audio_file.exists():
             # Both mic and system audio - combine them
             mic_audio = np.concatenate(self.audio_data, axis=0)
@@ -214,7 +230,6 @@ class AudioRecorder:
             
         except Exception as e:
             print(f"Warning: Could not combine audio: {e}")
-            print("Using microphone audio only.")
             
     def _load_audio(self, filename):
         """Load audio from WAV file"""

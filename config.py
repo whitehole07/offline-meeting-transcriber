@@ -14,8 +14,6 @@ TRANSCRIPTION_FILE = OUTPUT_DIR / f"transcription_{datetime.now().strftime('%H%M
 DIARIZED_FILE = OUTPUT_DIR / f"diarized_{datetime.now().strftime('%H%M%S')}.json"
 
 # Audio settings
-SAMPLE_RATE = 16000
-CHANNELS = 2  # Stereo for mic + system audio
 CHUNK_SIZE = 1024
 RECORDING_FORMAT = "wav"
 
