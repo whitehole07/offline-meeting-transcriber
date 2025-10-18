@@ -43,10 +43,13 @@ class SpeakerDiarizer:
         """Load SpeechBrain speaker embedding model"""
         try:
             from speechbrain.pretrained import EncoderClassifier
+            from speechbrain.utils.fetching import LocalStrategy
             
             self.embedding_model = EncoderClassifier.from_hparams(
                 source=self.source_model_path,
-                savedir=self.savedir_model_path
+                savedir=self.savedir_model_path,
+                local_strategy=LocalStrategy.COPY,        # ← avoids symlinks on Windows
+                overrides={"pretrained_path": self.source_model_path}, # ensure all paths are local
             )
             logger.info("Speaker embedding model loaded")
             

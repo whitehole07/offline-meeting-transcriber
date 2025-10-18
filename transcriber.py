@@ -1,3 +1,6 @@
+import os
+os.environ["HF_HUB_OFFLINE"] = "1"  # must be set before import that might fetch
+
 import json
 import sys
 import warnings
