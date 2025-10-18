@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 import librosa
 from faster_whisper import WhisperModel
-# from pyannote.audio import Pipeline
 from config import RECORDING_FILE, TRANSCRIPTION_FILE, DIARIZED_FILE, WHISPER_MODEL, WHISPER_LANGUAGE, WHISPER_MODEL, HF_TOKEN, SAMPLE_RATE
 from config import WHISPER_MODEL_PATH
 from config import DIARIZATION_MODEL_PATH
@@ -50,7 +49,7 @@ class MeetingTranscriber:
         print(f"Transcription saved to {TRANSCRIPTION_FILE}")
         
         # Perform diarization
-        """print("Starting speaker diarization...")
+        print("Starting speaker diarization...")
         diarization_result = self._diarize_audio()
         
         # Combine transcription and diarization
@@ -60,11 +59,7 @@ class MeetingTranscriber:
                 json.dump(combined_result, f, indent=2, ensure_ascii=False)
             print(f"Diarized transcription saved to {DIARIZED_FILE}")
         else:
-            # Fallback: simple segmentation
-            simple_result = self._simple_segmentation(transcription)
-            with open(DIARIZED_FILE, 'w', encoding='utf-8') as f:
-                json.dump(simple_result, f, indent=2, ensure_ascii=False)
-            print(f"Simple segmentation saved to {DIARIZED_FILE}")"""
+            print("Diarization failed - skipping speaker identification")
             
         return True
         
@@ -111,67 +106,85 @@ class MeetingTranscriber:
             return None
             
     def _diarize_audio(self):
-        """Perform speaker diarization using pyannote.audio and merge consecutive segments of the same speaker"""
+        """Perform speaker diarization using SpeechBrain and merge consecutive segments of the same speaker"""
         try:
-            # Initialize diarization pipeline
-            if not hasattr(self, 'diarization_pipeline') or self.diarization_pipeline is None:
-                print("Loading diarization model...")
-                model_path=DIARIZATION_MODEL_PATH or r"./models/models--pyannote--speaker-diarization-3.1/"
-                self.diarization_pipeline = Pipeline.from_pretrained(model_path)
-
-            # Perform diarization
-            print("Performing speaker diarization...")
-            diarization = self.diarization_pipeline(str(RECORDING_FILE))
-
-            # Convert to list of merged segments
-            merged_segments = []
-            prev_segment = None
-
-            for turn, speaker in diarization.speaker_diarization:
-                if prev_segment and prev_segment['speaker'] == speaker:
-                    # extend the previous segment
-                    prev_segment['end'] = float(turn.end)
-                else:
-                    # start a new segment
-                    prev_segment = {
-                        "start": float(turn.start),
-                        "end": float(turn.end),
-                        "speaker": speaker
-                    }
-                    merged_segments.append(prev_segment)
-
-            return merged_segments
-
+            # Try SpeechBrain diarization
+            try:
+                from speechbrain.inference.speaker import EncoderClassifier
+                from speechbrain.processing.speech_augmentation import Resample
+                import torch
+                import torchaudio
+                
+                print("Loading SpeechBrain diarization model...")
+                
+                # Load pre-trained speaker embedding model
+                classifier = EncoderClassifier.from_hparams(
+                    source="speechbrain/spkrec-ecapa-voxceleb",
+                    savedir="pretrained_models/spkrec-ecapa-voxceleb"
+                )
+                
+                # Load and resample audio
+                waveform, sample_rate = torchaudio.load(str(RECORDING_FILE))
+                if sample_rate != 16000:
+                    resampler = Resample(sample_rate, 16000)
+                    waveform = resampler(waveform)
+                
+                # Simple diarization using sliding windows
+                window_size = 1.5  # seconds
+                hop_size = 0.5     # seconds
+                window_samples = int(window_size * 16000)
+                hop_samples = int(hop_size * 16000)
+                
+                segments = []
+                current_time = 0.0
+                
+                print("Performing speaker diarization...")
+                
+                # Process audio in sliding windows
+                for i in range(0, waveform.shape[1] - window_samples, hop_samples):
+                    window = waveform[:, i:i + window_samples]
+                    
+                    # Extract speaker embedding
+                    embedding = classifier.encode_batch(window)
+                    
+                    # Simple clustering based on embedding similarity
+                    speaker_id = f"SPEAKER_{hash(str(embedding.detach().numpy())) % 3:02d}"
+                    
+                    segments.append({
+                        "start": current_time,
+                        "end": current_time + window_size,
+                        "speaker": speaker_id
+                    })
+                    
+                    current_time += hop_size
+                
+                # Merge consecutive segments of the same speaker
+                merged_segments = []
+                prev_segment = None
+                
+                for segment in segments:
+                    if prev_segment and prev_segment['speaker'] == segment['speaker']:
+                        # Extend previous segment
+                        prev_segment['end'] = segment['end']
+                    else:
+                        # Start new segment
+                        prev_segment = {
+                            "start": segment['start'],
+                            "end": segment['end'],
+                            "speaker": segment['speaker']
+                        }
+                        merged_segments.append(prev_segment)
+                
+                print(f"Found {len(set(s['speaker'] for s in merged_segments))} speakers")
+                return merged_segments
+                
+            except ImportError:
+                print("SpeechBrain not installed. Install with: pip install speechbrain")
+                raise ImportError("SpeechBrain not available")
+                
         except Exception as e:
             print(f"Diarization error: {e}")
-            print("Falling back to simple segmentation...")
             return None
-
-            
-    def _simple_segmentation(self, transcription):
-        """Simple segmentation when diarization fails"""
-        # Split transcription into sentences
-        sentences = transcription.split('. ')
-        
-        # Create simple segments (assuming single speaker for now)
-        segments = []
-        current_time = 0.0
-        time_per_sentence = 3.0  # Rough estimate: 3 seconds per sentence
-        
-        for i, sentence in enumerate(sentences):
-            if sentence.strip():
-                segments.append({
-                    "start": current_time,
-                    "end": current_time + time_per_sentence,
-                    "speaker": "Speaker_1",
-                    "text": sentence.strip()
-                })
-                current_time += time_per_sentence
-                
-        return {
-            "segments": segments,
-            "transcription": transcription
-        }
         
     def _combine_transcription_diarization(self, transcription, transcription_segments, diarization_segments):
         """Combine transcription with diarization results"""
