@@ -287,7 +287,7 @@ class AudioRecorder:
                 logging.info("Processing microphone and system audio...")
                 self._combine_audio()
                 logging.info(f"Combined audio saved to {RECORDING_FILE}")
-                logging.info(f"  Sample rate: {self.sys_sample_rate} Hz (system audio rate)")
+                logging.info(f" → {self.sys_sample_rate} Hz (system audio rate)")
             elif self.mic_audio_data:
                 # Only microphone audio
                 logging.info("Processing microphone audio...")

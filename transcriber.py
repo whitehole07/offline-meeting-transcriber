@@ -7,9 +7,17 @@ import numpy as np
 import librosa
 from faster_whisper import WhisperModel
 from pyannote.audio import Pipeline
-from config import RECORDING_FILE, TRANSCRIPTION_FILE, DIARIZED_FILE, WHISPER_MODEL, WHISPER_LANGUAGE, WHISPER_MODEL, HF_TOKEN, SAMPLE_RATE
-from config import WHISPER_MODEL_PATH
-from config import DIARIZATION_MODEL_PATH
+from config import (
+    RECORDING_FILE, 
+    TRANSCRIPTION_FILE, 
+    DIARIZED_FILE, 
+    WHISPER_MODEL, 
+    WHISPER_LANGUAGE, 
+    WHISPER_MODEL, 
+    SAMPLE_RATE,
+    WHISPER_MODEL_PATH,
+    DIARIZATION_MODEL_PATH
+)
 
 # Suppress specific warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio")
