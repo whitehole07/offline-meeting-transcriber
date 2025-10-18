@@ -14,6 +14,14 @@ import torch
 # Suppress warnings
 warnings.filterwarnings("ignore")
 
+# Disable debug logging but keep info
+logging.getLogger("speechbrain").setLevel(logging.INFO)
+logging.getLogger("torch").setLevel(logging.INFO)
+logging.getLogger("transformers").setLevel(logging.INFO)
+logging.getLogger("librosa").setLevel(logging.INFO)
+logging.getLogger("sklearn").setLevel(logging.INFO)
+logging.getLogger("numba").setLevel(logging.INFO)
+
 logger = logging.getLogger(__name__)
 
 class SpeakerDiarizer:
@@ -48,7 +56,7 @@ class SpeakerDiarizer:
             self.embedding_model = EncoderClassifier.from_hparams(
                 source=self.source_model_path,
                 savedir=self.savedir_model_path,
-                local_strategy=LocalStrategy.COPY,        # ← avoids symlinks on Windows
+                local_strategy=LocalStrategy.COPY,        # ← ensures local file copies
                 overrides={"pretrained_path": self.source_model_path}, # ensure all paths are local
             )
             logger.info("Speaker embedding model loaded")

@@ -1,12 +1,9 @@
 import os
 os.environ["HF_HUB_OFFLINE"] = "1"  # must be set before import that might fetch
 
-import json
-import sys
 import warnings
 import logging
 from pathlib import Path
-import numpy as np
 import librosa
 # Heavy modules will be imported lazily when needed
 from config import (
@@ -15,7 +12,6 @@ from config import (
     DIARIZED_FILE, 
     WHISPER_MODEL, 
     WHISPER_LANGUAGE, 
-    WHISPER_MODEL, 
     SAMPLE_RATE,
     WHISPER_MODEL_PATH,
     DIARIZATION_MODEL_PATH
@@ -24,8 +20,15 @@ from speaker_diarizer import SpeakerDiarizer
 
 # Suppress specific warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio")
-# warnings.filterwarnings("ignore", category=UserWarning, module="speechbrain")
-warnings.filterwarnings("ignore", category=UserWarning, module="pyannote")
+warnings.filterwarnings("ignore", category=UserWarning, module="speechbrain")
+
+# Disable debug logging but keep info
+logging.getLogger("speechbrain").setLevel(logging.INFO)
+logging.getLogger("torch").setLevel(logging.INFO)
+logging.getLogger("transformers").setLevel(logging.INFO)
+logging.getLogger("librosa").setLevel(logging.INFO)
+logging.getLogger("sklearn").setLevel(logging.INFO)
+logging.getLogger("numba").setLevel(logging.INFO)
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -33,7 +36,6 @@ logger = logging.getLogger(__name__)
 class MeetingTranscriber:
     def __init__(self):
         self.whisper_model = None
-        self.diarization_pipeline = None
         self.speaker_diarizer = None
         
     def _load_whisper_model(self):

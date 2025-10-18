@@ -22,11 +22,8 @@ RECORDING_FORMAT = "wav"
 WHISPER_MODEL = "medium"     # Options: base, small, medium, large
 WHISPER_LANGUAGE = "it"      # Language code for transcription
 WHISPER_MODEL_PATH = f"./models/faster-whisper-{WHISPER_MODEL}/"  # Local model path
-DIARIZATION_MODEL_PATH = "./models/spkrec-ecapa-voxceleb/"  # Pyannote custom diarization model path
+DIARIZATION_MODEL_PATH = "./models/spkrec-ecapa-voxceleb/"  # SpeechBrain speaker embedding model path
 
-# Speaker diarization settings
-DIARIZATION_MIN_SPEAKERS = 1
-DIARIZATION_MAX_SPEAKERS = 10
 
 # Create output directory
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

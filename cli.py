@@ -33,11 +33,9 @@ class MeetingTranscriberCLI:
             logging.warning("Recording already in progress!")
             return
         
-        # Show platform-specific information
-        if sys.platform == "win32":
-            logging.info("Windows detected - diarization will be disabled")
-        else:
-            logging.info("Linux/Mac detected - diarization will be enabled")
+        # Show platform information
+        platform_name = "Windows" if sys.platform == "win32" else "Linux/Mac"
+        logging.info(f"{platform_name} detected - diarization will be enabled")
             
         try:
             # Clean up any existing files
@@ -89,11 +87,8 @@ class MeetingTranscriberCLI:
             logging.info(f" → {RECORDING_FILE}")
             logging.info(f" → {TRANSCRIPTION_FILE}")
             
-            # Show diarization file only on non-Windows platforms
-            if sys.platform != "win32":
-                logging.info(f" → {DIARIZED_FILE}")
-            else:
-                logging.info(" → Diarization disabled on Windows")
+            # Show diarization file
+            logging.info(f" → {DIARIZED_FILE}")
         else:
             logging.error("Processing failed!")
             
