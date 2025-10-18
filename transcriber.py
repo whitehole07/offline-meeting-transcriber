@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import librosa
 from faster_whisper import WhisperModel
-from pyannote.audio import Pipeline
+# from pyannote.audio import Pipeline
 from config import RECORDING_FILE, TRANSCRIPTION_FILE, DIARIZED_FILE, WHISPER_MODEL, WHISPER_LANGUAGE, WHISPER_MODEL, HF_TOKEN, SAMPLE_RATE
 from config import WHISPER_MODEL_PATH
 from config import DIARIZATION_MODEL_PATH
@@ -50,7 +50,7 @@ class MeetingTranscriber:
         print(f"Transcription saved to {TRANSCRIPTION_FILE}")
         
         # Perform diarization
-        print("Starting speaker diarization...")
+        """print("Starting speaker diarization...")
         diarization_result = self._diarize_audio()
         
         # Combine transcription and diarization
@@ -64,7 +64,7 @@ class MeetingTranscriber:
             simple_result = self._simple_segmentation(transcription)
             with open(DIARIZED_FILE, 'w', encoding='utf-8') as f:
                 json.dump(simple_result, f, indent=2, ensure_ascii=False)
-            print(f"Simple segmentation saved to {DIARIZED_FILE}")
+            print(f"Simple segmentation saved to {DIARIZED_FILE}")"""
             
         return True
         

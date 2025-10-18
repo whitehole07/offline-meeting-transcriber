@@ -59,8 +59,8 @@ class MeetingTranscriberCLI:
         self.recording_started = False
         
         # TODO: Uncomment to enable transcription and diarization
-        # print("Processing audio...")
-        # success = self.transcriber.transcribe_and_diarize()
+        print("Processing audio...")
+        success = self.transcriber.transcribe_and_diarize()
         success = True
         
         if success:
