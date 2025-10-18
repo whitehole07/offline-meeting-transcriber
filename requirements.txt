@@ -1,13 +1,13 @@
 sounddevice>=0.4.6
 soundfile>=0.12.1
-pyaudiowpatch>=0.2.12.9; sys_platform == 'win32'
+pyaudiowpatch>=0.2.12.7; sys_platform == 'win32'
 PyAudio>=0.2.11; sys_platform != 'win32'
 numpy>=1.24.0
 scipy>=1.10.0
 librosa>=0.10.0
 faster-whisper>=0.10.0
 torch>=2.0.0
-torchaudio>=2.0.0
+torchaudio>=2.2.0
 pyannote.audio>=3.1.0
 transformers>=4.30.0
 requests>=2.31.0
