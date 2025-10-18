@@ -1,6 +1,7 @@
 import sys
 import time
 import wave
+import logging
 import numpy as np
 import sounddevice as sd
 import librosa
@@ -13,8 +14,8 @@ if sys.platform == "win32":
     try:
         import pyaudiowpatch as pyaudio
     except ImportError:
-        print("Warning: pyaudiowpatch not found. Install it for better Windows audio support:")
-        print("  pip install pyaudiowpatch")
+        logging.warning("pyaudiowpatch not found. Install it for better Windows audio support:")
+        logging.warning("  pip install pyaudiowpatch")
         pyaudio = None
 else:
     pyaudio = None  # Not used on Linux
@@ -47,13 +48,13 @@ class AudioRecorder:
     def start_recording(self, no_mic=False):
         """Start recording microphone and/or system audio"""
         if self.is_recording:
-            print("Already recording!")
+            logging.warning("Already recording!")
             return
             
         if no_mic:
-            print("Starting system audio recording only...")
+            logging.info("Starting system audio recording only...")
         else:
-            print("Starting recording with microphone and system audio...")
+            logging.info("Starting recording with microphone and system audio...")
             
         # Reset data BEFORE starting streams to ensure sync
         self.sys_audio_data, self.mic_audio_data = [], []
@@ -70,12 +71,12 @@ class AudioRecorder:
             self._start_mic_audio()
         else:
             self.mic_stream = None
-            print("Microphone recording disabled")
+            logging.info("Microphone recording disabled")
         
         self._start_system_audio()
         
-        print("Recording started. Press Ctrl+C to stop.")
-        print("Note: Audio streams may have slight timing differences at start/end")
+        logging.info("Recording started. Press Ctrl+C to stop.")
+        logging.info("Note: Audio streams may have slight timing differences at start/end")
         
     def _check_system_audio(self):
         """Check if system audio recording is available"""
@@ -86,8 +87,8 @@ class AudioRecorder:
                     try:
                         pa.get_default_wasapi_loopback()
                     except Exception as e:
-                        print("Warning: System audio loopback not available on Windows")
-                        print("Make sure you have audio drivers installed and WASAPI-enabled Windows version")
+                        logging.warning("System audio loopback not available on Windows")
+                        logging.warning("Make sure you have audio drivers installed and WASAPI-enabled Windows version")
             else:
                 # Linux: Check for available input devices (Speaker/default/pipewire)
                 devices = sd.query_devices()
@@ -96,13 +97,13 @@ class AudioRecorder:
                     name_lower = dev['name'].lower()
                     if dev['max_input_channels'] > 0 and ('speaker' in name_lower or 'default' in name_lower or 'pipewire' in name_lower):
                         found_device = True
-                        print(f"Found system audio device: {dev['name']}")
+                        logging.info(f"Found system audio device: {dev['name']}")
                         break
                 if not found_device:
-                    print("Warning: No suitable audio input device found")
-                    print("Make sure PulseAudio/PipeWire is running")
+                    logging.warning("No suitable audio input device found")
+                    logging.warning("Make sure PulseAudio/PipeWire is running")
         except Exception as e:
-            print(f"Warning: Could not check system audio: {e}")
+            logging.warning(f"Could not check system audio: {e}")
     
     def _sys_audio_callback_pyaudio(self, indata, frame_count, time_info, status):
         """Callback for system audio (PyAudio on Windows)"""
@@ -118,7 +119,7 @@ class AudioRecorder:
     def _sys_audio_callback_sd(self, indata, frames, time, status):
         """Callback for system audio (sounddevice on Linux)"""
         if status:
-            print(f"System audio status: {status}")
+            logging.info(f"System audio status: {status}")
         if self.is_recording:
             # sounddevice returns numpy array directly
             self.sys_audio_data.append(indata.copy())
@@ -137,7 +138,7 @@ class AudioRecorder:
     def _mic_audio_callback_sd(self, indata, frames, time, status):
         """Callback for microphone audio (sounddevice on Linux)"""
         if status:
-            print(f"Microphone audio status: {status}")
+            logging.info(f"Microphone audio status: {status}")
         if self.is_recording:
             # sounddevice returns numpy array directly
             self.mic_audio_data.append(indata.copy())
@@ -152,7 +153,7 @@ class AudioRecorder:
                 self.sys_channels = max(1, int(lb["maxInputChannels"]))
                 input_index = lb["index"]
                 
-                print(f"System audio: {self.sys_sample_rate} Hz, {self.sys_channels} channel(s)")
+                logging.info(f"System audio: {self.sys_sample_rate} Hz, {self.sys_channels} channel(s)")
                 
                 self.sys_stream = self.pa.open(
                     format=pyaudio.paInt16,
@@ -178,7 +179,7 @@ class AudioRecorder:
                     if dev['max_input_channels'] > 0 and 'speaker' in name_lower:
                         system_device = dev
                         system_index = idx
-                        print(f"Using system audio device: {dev['name']}")
+                        logging.info(f"Using system audio device: {dev['name']}")
                         break
                 
                 # Fallback to default or pipewire device
@@ -188,7 +189,7 @@ class AudioRecorder:
                         if dev['max_input_channels'] > 0 and ('default' in name_lower or 'pipewire' in name_lower):
                             system_device = dev
                             system_index = idx
-                            print(f"Using system audio device: {dev['name']}")
+                            logging.info(f"Using system audio device: {dev['name']}")
                             break
                 
                 if not system_device:
@@ -197,7 +198,7 @@ class AudioRecorder:
                 # Start sounddevice input stream
                 self.sys_channels = min(2, system_device['max_input_channels'])
                 
-                print(f"System audio: {self.sys_sample_rate} Hz, {self.sys_channels} channel(s)")
+                logging.info(f"System audio: {self.sys_sample_rate} Hz, {self.sys_channels} channel(s)")
                 
                 self.sys_stream = sd.InputStream(
                     device=system_index,
@@ -210,7 +211,7 @@ class AudioRecorder:
                 self.sys_stream.start()
                 
         except Exception as e:
-            print(f"Warning: Could not start system audio recording: {e}")
+            logging.warning(f"Could not start system audio recording: {e}")
 
     def _start_mic_audio(self):
         """Start mic audio recording using cross-platform methods"""
@@ -221,7 +222,7 @@ class AudioRecorder:
                 self.mic_sample_rate = int(dev["defaultSampleRate"])
                 self.mic_channels = max(1, int(dev["maxInputChannels"]))
                 
-                print(f"Microphone: {self.mic_sample_rate} Hz, {self.mic_channels} channel(s)")
+                logging.info(f"Microphone: {self.mic_sample_rate} Hz, {self.mic_channels} channel(s)")
                 
                 self.mic_stream = self.pa.open(
                     format=pyaudio.paInt16,
@@ -235,7 +236,7 @@ class AudioRecorder:
             else:
                 # Linux: Use sounddevice
                 self.mic_channels = 1  # Mono for mic
-                print(f"Microphone: {self.mic_sample_rate} Hz, {self.mic_channels} channel")
+                logging.info(f"Microphone: {self.mic_sample_rate} Hz, {self.mic_channels} channel")
                 
                 self.mic_stream = sd.InputStream(
                     channels=self.mic_channels,
@@ -247,15 +248,15 @@ class AudioRecorder:
                 self.mic_stream.start()
                 
         except Exception as e:
-            print(f"Warning: Could not start mic audio recording: {e}")
+            logging.warning(f"Could not start mic audio recording: {e}")
             
     def stop_recording(self):
         """Stop recording and save audio"""
         if not self.is_recording:
-            print("Not currently recording!")
+            logging.warning("Not currently recording!")
             return
             
-        print("Stopping recording...")
+        logging.info("Stopping recording...")
         self.is_recording = False
         
         # Stop microphone recording
@@ -283,30 +284,30 @@ class AudioRecorder:
         try:
             if self.mic_audio_data and self.sys_audio_data:
                 # Both mic and system audio - combine them
-                print("Processing microphone and system audio...")
+                logging.info("Processing microphone and system audio...")
                 self._combine_audio()
-                print(f"Combined audio saved to {RECORDING_FILE}")
-                print(f"  Sample rate: {self.sys_sample_rate} Hz (system audio rate)")
+                logging.info(f"Combined audio saved to {RECORDING_FILE}")
+                logging.info(f"  Sample rate: {self.sys_sample_rate} Hz (system audio rate)")
             elif self.mic_audio_data:
                 # Only microphone audio
-                print("Processing microphone audio...")
+                logging.info("Processing microphone audio...")
                 mic_audio = np.concatenate(self.mic_audio_data, axis=0)
                 self._save_audio_int16(mic_audio, RECORDING_FILE, self.mic_sample_rate, self.mic_channels)
-                print(f"Microphone audio saved to {RECORDING_FILE}")
-                print(f"  Format: {self.mic_channels} channel(s), 16-bit, {self.mic_sample_rate} Hz")
+                logging.info(f"Microphone audio saved to {RECORDING_FILE}")
+                logging.info(f" → {self.mic_channels} channel(s), 16-bit, {self.mic_sample_rate} Hz")
             elif self.sys_audio_data:
                 # Only system audio
-                print("Processing system audio...")
+                logging.info("Processing system audio...")
                 sys_audio = np.concatenate(self.sys_audio_data, axis=0)
                 self._save_audio_int16(sys_audio, RECORDING_FILE, self.sys_sample_rate, self.sys_channels)
-                print(f"System audio saved to {RECORDING_FILE}")
-                print(f"  Format: {self.sys_channels} channel(s), 16-bit, {self.sys_sample_rate} Hz")
+                logging.info(f"System audio saved to {RECORDING_FILE}")
+                logging.info(f" → {self.sys_channels} channel(s), 16-bit, {self.sys_sample_rate} Hz")
             else:
-                print("No audio was recorded!")
+                logging.warning("No audio was recorded!")
         except Exception as e:
-            print(f"Error saving audio: {e}")
+            logging.error(f"Error saving audio: {e}")
             
-        print("Recording stopped.")
+        logging.info("Recording stopped.")
         
     def _save_audio_int16(self, audio_data, filename, sample_rate=48000, channels=1):
         """Save audio data (already in int16 format) to WAV file"""
@@ -333,50 +334,50 @@ class AudioRecorder:
             mic_audio = np.concatenate(self.mic_audio_data, axis=0)
             sys_audio = np.concatenate(self.sys_audio_data, axis=0)
             
-            print(f"  Mic shape before: {mic_audio.shape}, channels: {self.mic_channels}")
-            print(f"  Sys shape before: {sys_audio.shape}, channels: {self.sys_channels}")
+            logging.debug(f"  Mic shape before: {mic_audio.shape}, channels: {self.mic_channels}")
+            logging.debug(f"  Sys shape before: {sys_audio.shape}, channels: {self.sys_channels}")
             
             # Convert to 1D mono arrays (flatten multi-channel data)
             if len(mic_audio.shape) > 1:
                 if mic_audio.shape[1] == 2:
                     # Stereo: average the two channels
-                    print(f"  Converting mic from stereo to mono")
+                    logging.debug(f"  Converting mic from stereo to mono")
                     mic_audio = mic_audio.mean(axis=1).astype(np.int16)
                 elif mic_audio.shape[1] == 1:
                     # Already mono but 2D: flatten it
-                    print(f"  Flattening mic audio")
+                    logging.debug(f"  Flattening mic audio")
                     mic_audio = mic_audio.flatten()
             elif self.mic_channels == 2:
                 # 1D interleaved stereo [L, R, L, R, ...] - reshape and average
-                print(f"  Deinterleaving mic stereo to mono")
+                logging.debug(f"  Deinterleaving mic stereo to mono")
                 mic_audio = mic_audio.reshape(-1, 2).mean(axis=1).astype(np.int16)
             
             if len(sys_audio.shape) > 1:
                 if sys_audio.shape[1] == 2:
                     # Stereo: average the two channels
-                    print(f"  Converting sys from stereo to mono")
+                    logging.debug(f"  Converting sys from stereo to mono")
                     sys_audio = sys_audio.mean(axis=1).astype(np.int16)
                 elif sys_audio.shape[1] == 1:
                     # Already mono but 2D: flatten it
-                    print(f"  Flattening sys audio")
+                    logging.debug(f"  Flattening sys audio")
                     sys_audio = sys_audio.flatten()
             elif self.sys_channels == 2:
                 # 1D interleaved stereo [L, R, L, R, ...] - reshape and average
-                print(f"  Deinterleaving sys stereo to mono")
+                logging.debug(f"  Deinterleaving sys stereo to mono")
                 sys_audio = sys_audio.reshape(-1, 2).mean(axis=1).astype(np.int16)
             
-            print(f"  Mic shape after: {mic_audio.shape}")
-            print(f"  Sys shape after: {sys_audio.shape}")
+            logging.debug(f"  Mic shape after: {mic_audio.shape}")
+            logging.debug(f"  Sys shape after: {sys_audio.shape}")
             
             # Calculate actual recording durations
             mic_duration = len(mic_audio) / self.mic_sample_rate
             sys_duration = len(sys_audio) / self.sys_sample_rate
-            print(f"  Mic duration: {mic_duration:.2f}s")
-            print(f"  Sys duration: {sys_duration:.2f}s")
+            logging.debug(f"  Mic duration: {mic_duration:.2f}s")
+            logging.debug(f"  Sys duration: {sys_duration:.2f}s")
             
             # Resample mic to match system audio sample rate FIRST
             if self.mic_sample_rate != self.sys_sample_rate:
-                print(f"  Resampling mic: {self.mic_sample_rate} Hz -> {self.sys_sample_rate} Hz")
+                logging.debug(f"  Resampling mic: {self.mic_sample_rate} Hz -> {self.sys_sample_rate} Hz")
                 mic_audio_float = mic_audio.astype(np.float32) / 32768.0
                 mic_audio = librosa.resample(
                     mic_audio_float, 
@@ -384,34 +385,34 @@ class AudioRecorder:
                     target_sr=self.sys_sample_rate
                 )
                 mic_audio = (mic_audio * 32767).astype(np.int16)
-                print(f"  Mic shape after resampling: {mic_audio.shape}")
+                logging.debug(f"  Mic shape after resampling: {mic_audio.shape}")
             
             # Now both are at the same sample rate - align by duration
             # Use the shorter duration to avoid padding with silence
             target_duration = min(mic_duration, sys_duration)
             target_samples = int(target_duration * self.sys_sample_rate)
             
-            print(f"  Target duration: {target_duration:.2f}s ({target_samples} samples)")
+            logging.debug(f"  Target duration: {target_duration:.2f}s ({target_samples} samples)")
             
             # Trim both to the same length (use shorter duration)
             mic_audio = mic_audio[:target_samples]
             sys_audio = sys_audio[:target_samples]
             
-            print(f"  Final aligned - Mic: {len(mic_audio)}, Sys: {len(sys_audio)}")
+            logging.debug(f"  Final aligned - Mic: {len(mic_audio)}, Sys: {len(sys_audio)}")
             
             # Simple mixing - convert to float for mixing, then back to int16
-            print(f"  Mixing audio (50/50 blend)")
+            logging.debug(f"  Mixing audio (50/50 blend)")
             mic_float = mic_audio.astype(np.float32)
             sys_float = sys_audio.astype(np.float32)
             combined = ((mic_float + sys_float) / 2).astype(np.int16)
             
-            print(f"  Final combined shape: {combined.shape}")
+            logging.debug(f"  Final combined shape: {combined.shape}")
             
             # Save combined audio at system audio sample rate (mono after mixing)
             self._save_audio_int16(combined, RECORDING_FILE, self.sys_sample_rate, channels=1)
             
         except Exception as e:
-            print(f"Warning: Could not combine audio: {e}")
+            logging.warning(f"Could not combine audio: {e}")
             # Fallback: save audios separately
             if self.mic_audio_data:
                 mic_audio = np.concatenate(self.mic_audio_data, axis=0)

@@ -7,9 +7,17 @@ A lightweight tool for recording and transcribing meetings offline.
 import sys
 import signal
 import time
+import logging
 from recorder import AudioRecorder
 from transcriber import MeetingTranscriber
 from config import RECORDING_FILE, TRANSCRIPTION_FILE, DIARIZED_FILE
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%H:%M:%S'
+)
 
 class MeetingTranscriberCLI:
     """CLI interface for the meeting transcriber application."""
@@ -22,7 +30,7 @@ class MeetingTranscriberCLI:
     def start_recording(self, no_mic=False):
         """Start recording audio"""
         if self.recording_started:
-            print("Recording already in progress!")
+            logging.warning("Recording already in progress!")
             return
             
         try:
@@ -46,35 +54,35 @@ class MeetingTranscriberCLI:
                 self.stop_recording()
                 
         except Exception as e:
-            print(f"Error starting recording: {e}")
+            logging.error(f"Error starting recording: {e}")
             self.recording_started = False
             
     def stop_recording(self):
         """Stop recording and process audio"""
         if not self.recording_started:
-            print("No recording in progress!")
+            logging.warning("No recording in progress!")
             return
             
         self.recorder.stop_recording()
         self.recording_started = False
         
         # TODO: Uncomment to enable transcription and diarization
-        print("Processing audio...")
+        logging.info("Processing audio...")
         success = self.transcriber.transcribe_and_diarize()
         success = True
         
         if success:
-            print("\nProcessing complete!")
-            print(f"Files created:")
-            print(f"  - {RECORDING_FILE}")
-            print(f"  - {TRANSCRIPTION_FILE}")
-            print(f"  - {DIARIZED_FILE}")
+            logging.info("Processing complete!")
+            logging.info(f"Files created:")
+            logging.info(f" → {RECORDING_FILE}")
+            logging.info(f" → {TRANSCRIPTION_FILE}")
+            logging.info(f" → {DIARIZED_FILE}")
         else:
-            print("Processing failed!")
+            logging.error("Processing failed!")
             
     def _signal_handler(self, signum, frame):
         """Handle interrupt signals"""
-        print(f"\nReceived signal {signum}")
+        logging.info(f"Received signal {signum}")
         self.stop_recording()
         sys.exit(0)
 

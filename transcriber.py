@@ -1,12 +1,23 @@
 import json
 import sys
+import warnings
+import logging
 from pathlib import Path
 import numpy as np
 import librosa
 from faster_whisper import WhisperModel
+from pyannote.audio import Pipeline
 from config import RECORDING_FILE, TRANSCRIPTION_FILE, DIARIZED_FILE, WHISPER_MODEL, WHISPER_LANGUAGE, WHISPER_MODEL, HF_TOKEN, SAMPLE_RATE
 from config import WHISPER_MODEL_PATH
 from config import DIARIZATION_MODEL_PATH
+
+# Suppress specific warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio")
+# warnings.filterwarnings("ignore", category=UserWarning, module="speechbrain")
+warnings.filterwarnings("ignore", category=UserWarning, module="pyannote")
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 class MeetingTranscriber:
     def __init__(self):
@@ -17,22 +28,21 @@ class MeetingTranscriber:
         """Load whisper model"""
         if self.whisper_model is None:
             try:
-                print(f"Loading Whisper model ({WHISPER_MODEL})...")
-                model_path = WHISPER_MODEL_PATH or r"./models/faster-whisper-medium/"
-                self.whisper_model = WhisperModel(model_path, local_files_only=True, device="cpu", compute_type="int8")
-                print("Whisper model loaded successfully")
+                logger.info(f"Loading Whisper model ({WHISPER_MODEL})...")
+                self.whisper_model = WhisperModel(WHISPER_MODEL_PATH, local_files_only=True, device="cpu", compute_type="int8")
+                logger.info("Whisper model loaded successfully")
             except Exception as e:
-                print(f"Error loading Whisper model: {e}")
+                logger.error(f"Error loading Whisper model: {e}")
                 return False
         return True
         
     def transcribe_and_diarize(self):
         """Transcribe audio and perform speaker diarization"""
         if not RECORDING_FILE.exists():
-            print(f"Error: Recording file {RECORDING_FILE} not found!")
+            logger.error(f"Recording file {RECORDING_FILE} not found!")
             return False
             
-        print("Starting transcription...")
+        logger.info("Starting transcription...")
         
         # Load whisper model
         if not self._load_whisper_model():
@@ -46,20 +56,27 @@ class MeetingTranscriber:
         # Save transcription
         with open(TRANSCRIPTION_FILE, 'w', encoding='utf-8') as f:
             f.write(transcription)
-        print(f"Transcription saved to {TRANSCRIPTION_FILE}")
+        logger.info(f"Transcription saved to {TRANSCRIPTION_FILE}")
         
         # Perform diarization
-        print("Starting speaker diarization...")
+        logger.info("Starting speaker diarization...")
         diarization_result = self._diarize_audio()
         
         # Combine transcription and diarization
         if diarization_result:
             combined_result = self._combine_transcription_diarization(transcription, transcription_segments, diarization_result)
-            with open(DIARIZED_FILE, 'w', encoding='utf-8') as f:
-                json.dump(combined_result, f, indent=2, ensure_ascii=False)
-            print(f"Diarized transcription saved to {DIARIZED_FILE}")
+            
+            # Save JSON format
+            # with open(DIARIZED_FILE, 'w', encoding='utf-8') as f:
+            #     json.dump(combined_result, f, indent=2, ensure_ascii=False)
+            # print(f"Diarized transcription (JSON format) saved to {DIARIZED_FILE}")
+            
+            # Save text format
+            txt_file = DIARIZED_FILE.with_suffix('.txt')
+            self._save_diarization_txt(combined_result, txt_file)
+            logger.info(f"Diarized transcription (text format) saved to {txt_file}")
         else:
-            print("Diarization failed - skipping speaker identification")
+            logger.warning("Diarization failed - skipping speaker identification")
             
         return True
         
@@ -102,88 +119,42 @@ class MeetingTranscriber:
             return " ".join(transcription_parts), transcription_segments
                 
         except Exception as e:
-            print(f"Transcription error: {e}")
+            logger.error(f"Transcription error: {e}")
             return None
             
     def _diarize_audio(self):
-        """Perform speaker diarization using SpeechBrain and merge consecutive segments of the same speaker"""
+        """Perform speaker diarization using pyannote.audio and merge consecutive segments of the same speaker"""
         try:
-            # Try SpeechBrain diarization
-            try:
-                from speechbrain.inference.speaker import EncoderClassifier
-                from speechbrain.processing.speech_augmentation import Resample
-                import torch
-                import torchaudio
-                
-                print("Loading SpeechBrain diarization model...")
-                
-                # Load pre-trained speaker embedding model
-                classifier = EncoderClassifier.from_hparams(
-                    source="speechbrain/spkrec-ecapa-voxceleb",
-                    savedir="pretrained_models/spkrec-ecapa-voxceleb"
-                )
-                
-                # Load and resample audio
-                waveform, sample_rate = torchaudio.load(str(RECORDING_FILE))
-                if sample_rate != 16000:
-                    resampler = Resample(sample_rate, 16000)
-                    waveform = resampler(waveform)
-                
-                # Simple diarization using sliding windows
-                window_size = 1.5  # seconds
-                hop_size = 0.5     # seconds
-                window_samples = int(window_size * 16000)
-                hop_samples = int(hop_size * 16000)
-                
-                segments = []
-                current_time = 0.0
-                
-                print("Performing speaker diarization...")
-                
-                # Process audio in sliding windows
-                for i in range(0, waveform.shape[1] - window_samples, hop_samples):
-                    window = waveform[:, i:i + window_samples]
-                    
-                    # Extract speaker embedding
-                    embedding = classifier.encode_batch(window)
-                    
-                    # Simple clustering based on embedding similarity
-                    speaker_id = f"SPEAKER_{hash(str(embedding.detach().numpy())) % 3:02d}"
-                    
-                    segments.append({
-                        "start": current_time,
-                        "end": current_time + window_size,
-                        "speaker": speaker_id
-                    })
-                    
-                    current_time += hop_size
-                
-                # Merge consecutive segments of the same speaker
-                merged_segments = []
-                prev_segment = None
-                
-                for segment in segments:
-                    if prev_segment and prev_segment['speaker'] == segment['speaker']:
-                        # Extend previous segment
-                        prev_segment['end'] = segment['end']
-                    else:
-                        # Start new segment
-                        prev_segment = {
-                            "start": segment['start'],
-                            "end": segment['end'],
-                            "speaker": segment['speaker']
-                        }
-                        merged_segments.append(prev_segment)
-                
-                print(f"Found {len(set(s['speaker'] for s in merged_segments))} speakers")
-                return merged_segments
-                
-            except ImportError:
-                print("SpeechBrain not installed. Install with: pip install speechbrain")
-                raise ImportError("SpeechBrain not available")
-                
+            # Initialize diarization pipeline
+            if not hasattr(self, 'diarization_pipeline') or self.diarization_pipeline is None:
+                logger.info("Loading diarization model...")
+                self.diarization_pipeline = Pipeline.from_pretrained(DIARIZATION_MODEL_PATH)
+
+            # Perform diarization
+            logger.info("Performing speaker diarization...")
+            diarization = self.diarization_pipeline(str(RECORDING_FILE))
+
+            # Convert to list of merged segments
+            merged_segments = []
+            prev_segment = None
+
+            for turn, speaker in diarization.speaker_diarization:
+                if prev_segment and prev_segment['speaker'] == speaker:
+                    # extend the previous segment
+                    prev_segment['end'] = float(turn.end)
+                else:
+                    # start a new segment
+                    prev_segment = {
+                        "start": float(turn.start),
+                        "end": float(turn.end),
+                        "speaker": speaker
+                    }
+                    merged_segments.append(prev_segment)
+
+            return merged_segments
+
         except Exception as e:
-            print(f"Diarization error: {e}")
+            logger.error(f"Diarization error: {e}")
             return None
         
     def _combine_transcription_diarization(self, transcription, transcription_segments, diarization_segments):
@@ -228,10 +199,43 @@ class MeetingTranscriber:
             return result
             
         except Exception as e:
-            print(f"Warning: Could not align transcription with diarization: {e}")
+            logger.warning(f"Could not align transcription with diarization: {e}")
             # Fallback: return diarization segments without text alignment
             return {
                 "transcription": transcription,
                 "segments": diarization_segments,
                 "speakers": list(set(seg["speaker"] for seg in diarization_segments))
             }
+    
+    def _save_diarization_txt(self, combined_result, txt_file):
+        """Save diarization in text format: {SPEAKER} {time start}-{time end}: {transcription}"""
+        try:
+            with open(txt_file, 'w', encoding='utf-8') as f:
+                segments = combined_result.get("segments", [])
+                
+                for segment in segments:
+                    speaker = segment.get("speaker", "UNKNOWN")
+                    start_time = segment.get("start", 0)
+                    end_time = segment.get("end", 0)
+                    text = segment.get("text", "").strip()
+                    
+                    # Format time as MM:SS or HH:MM:SS
+                    start_formatted = self._format_time(start_time)
+                    end_formatted = self._format_time(end_time)
+                    
+                    # Write in the requested format
+                    f.write(f"{speaker} ({start_formatted}-{end_formatted}): {text}\n\n")
+            
+        except Exception as e:
+            logger.error(f"Error saving diarization text file: {e}")
+    
+    def _format_time(self, seconds):
+        """Format seconds as MM:SS or HH:MM:SS"""
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        
+        if hours > 0:
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        else:
+            return f"{minutes:02d}:{secs:02d}"
