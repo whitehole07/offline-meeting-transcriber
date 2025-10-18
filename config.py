@@ -28,8 +28,5 @@ DIARIZATION_MODEL_PATH = r"./models/speaker-diarization-3.1/"  # Pyannote custom
 DIARIZATION_MIN_SPEAKERS = 1
 DIARIZATION_MAX_SPEAKERS = 10
 
-# Hugging Face token for accessing gated models (e.g., pyannote)
-HF_TOKEN = os.getenv("HF_TOKEN")
-
 # Create output directory
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
