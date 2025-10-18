@@ -9,7 +9,7 @@ import signal
 import time
 import logging
 from recorder import AudioRecorder
-from transcriber import MeetingTranscriber
+# Heavy transcriber will be imported lazily when needed
 from config import RECORDING_FILE, TRANSCRIPTION_FILE, DIARIZED_FILE
 
 # Set up logging
@@ -24,7 +24,7 @@ class MeetingTranscriberCLI:
     
     def __init__(self):
         self.recorder = AudioRecorder()
-        self.transcriber = MeetingTranscriber()
+        self.transcriber = None  # Will be created lazily when needed
         self.recording_started = False
         
     def start_recording(self, no_mic=False):
@@ -32,6 +32,12 @@ class MeetingTranscriberCLI:
         if self.recording_started:
             logging.warning("Recording already in progress!")
             return
+        
+        # Show platform-specific information
+        if sys.platform == "win32":
+            logging.info("Windows detected - diarization will be disabled")
+        else:
+            logging.info("Linux/Mac detected - diarization will be enabled")
             
         try:
             # Clean up any existing files
@@ -68,6 +74,12 @@ class MeetingTranscriberCLI:
         
         # TODO: Uncomment to enable transcription and diarization
         logging.info("Processing audio...")
+        
+        # Create transcriber lazily when needed
+        if self.transcriber is None:
+            from transcriber import MeetingTranscriber
+            self.transcriber = MeetingTranscriber()
+        
         success = self.transcriber.transcribe_and_diarize()
         success = True
         
@@ -76,7 +88,12 @@ class MeetingTranscriberCLI:
             logging.info(f"Files created:")
             logging.info(f" → {RECORDING_FILE}")
             logging.info(f" → {TRANSCRIPTION_FILE}")
-            logging.info(f" → {DIARIZED_FILE}")
+            
+            # Show diarization file only on non-Windows platforms
+            if sys.platform != "win32":
+                logging.info(f" → {DIARIZED_FILE}")
+            else:
+                logging.info(" → Diarization disabled on Windows")
         else:
             logging.error("Processing failed!")
             

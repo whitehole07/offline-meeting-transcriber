@@ -22,7 +22,7 @@ RECORDING_FORMAT = "wav"
 WHISPER_MODEL = "medium"     # Options: base, small, medium, large
 WHISPER_LANGUAGE = "it"      # Language code for transcription
 WHISPER_MODEL_PATH = f"./models/faster-whisper-{WHISPER_MODEL}/"  # Local model path
-DIARIZATION_MODEL_PATH = "./models/speaker-diarization-3.1/"  # Pyannote custom diarization model path
+DIARIZATION_MODEL_PATH = "./models/spkrec-ecapa-voxceleb/"  # Pyannote custom diarization model path
 
 # Speaker diarization settings
 DIARIZATION_MIN_SPEAKERS = 1
