@@ -132,11 +132,6 @@ python cli.py start --no-mic
 #### Stop Recording & Process
 Press `Ctrl+C` to stop recording and automatically process the audio.
 
-#### Windows Users
-Double-click `meeting-agent.bat` for easy startup.
-
-**Note:** The recording will automatically stop and process when you press `Ctrl+C`.
-
 ## 📁 Output Files
 
 After processing, you'll find these files in `output/YYYYMMDD/`:
