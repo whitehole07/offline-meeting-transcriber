@@ -31,6 +31,7 @@ if errorlevel 1 (
 
 REM Run the meeting agent
 echo Starting Meeting Agent...
+echo Press Ctrl+C to stop recording and process audio
 echo.
 python cli.py start
 

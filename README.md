@@ -25,10 +25,40 @@ Transform your meetings into searchable, speaker-labeled transcripts without sen
 ### Prerequisites
 
 - Python 3.8 or higher
+- Git LFS (for downloading models)
 - Audio input device (microphone)
 - ~2GB free disk space for models
 
 ### Installation
+
+#### 🚀 **Quick Install (Recommended)**
+
+**Linux/Mac:**
+```bash
+git clone https://github.com/yourusername/offline-meeting-transcriber.git
+cd offline-meeting-transcriber
+chmod +x install.sh
+./install.sh
+```
+
+**Windows:**
+```cmd
+git clone https://github.com/yourusername/offline-meeting-transcriber.git
+cd offline-meeting-transcriber
+install.bat
+```
+
+The installation script will automatically:
+- ✅ Create a virtual environment
+- ✅ Install all Python dependencies
+- ✅ Download Whisper model (~1.5GB) via git lfs
+- ✅ Download SpeechBrain speaker model (~100MB) via git lfs
+- ✅ Set up the complete environment
+- ✅ Test the installation
+
+#### 🔧 **Manual Installation**
+
+If you prefer to install manually:
 
 1. **Clone the repository**
    ```bash
@@ -56,6 +86,15 @@ Transform your meetings into searchable, speaker-labeled transcripts without sen
    - Whisper model (~1.5GB)
    - SpeechBrain speaker model (~100MB)
 
+#### 📋 **Installation Scripts**
+
+The repository includes automated installation scripts:
+
+- **`install.sh`** - Linux/Mac installation script
+- **`install.bat`** - Windows installation script
+
+These scripts handle the complete setup process and are the recommended way to install the dependencies.
+
 ### Usage
 
 #### Start Recording
@@ -68,12 +107,12 @@ python cli.py start --no-mic
 ```
 
 #### Stop Recording & Process
-```bash
-python cli.py stop
-```
+Press `Ctrl+C` to stop recording and automatically process the audio.
 
 #### Windows Users
 Double-click `meeting-agent.bat` for easy startup.
+
+**Note:** The recording will automatically stop and process when you press `Ctrl+C`.
 
 ## 📁 Output Files
 
@@ -115,10 +154,10 @@ graph TD
 
 ### Core Components
 
-- **Audio Recorder** - Cross-platform dual-stream audio capture
-- **Whisper Engine** - Offline speech-to-text transcription
-- **Speaker Diarizer** - AI-powered speaker identification
-- **CLI Interface** - User-friendly command-line tool
+- **Audio Recorder** (`src/recorder.py`) - Cross-platform dual-stream audio capture
+- **Whisper Engine** (`src/transcriber.py`) - Offline speech-to-text transcription
+- **Speaker Diarizer** (`src/speaker_diarizer.py`) - AI-powered speaker identification
+- **CLI Interface** (`cli.py`) - User-friendly command-line tool
 
 ## 🔧 Configuration
 
@@ -198,6 +237,18 @@ python -c "from faster_whisper import WhisperModel; WhisperModel('medium')"
 - Check microphone levels
 - Try different Whisper model sizes
 - Verify language setting matches audio
+
+**Recording doesn't stop:**
+- Press `Ctrl+C` to stop recording and process audio
+- The system will automatically transcribe and diarize after stopping
+
+**Installation issues:**
+- Make sure you have Python 3.8+ installed
+- Ensure you have Git LFS installed (required for model downloads)
+- Ensure you have internet connection for model downloads
+- If models fail to download, try running the installation script again
+- Check that you have sufficient disk space (~2GB for models)
+- On Windows, make sure you're running the batch file as administrator if needed
 
 ### Platform-Specific Notes
 

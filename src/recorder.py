@@ -5,6 +5,8 @@ import logging
 import numpy as np
 import sounddevice as sd
 import librosa
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import CHUNK_SIZE, RECORDING_FILE
 
 # Platform-specific imports

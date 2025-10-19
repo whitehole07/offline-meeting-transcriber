@@ -5,7 +5,9 @@ import warnings
 import logging
 from pathlib import Path
 import librosa
+import sys
 # Heavy modules will be imported lazily when needed
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (
     RECORDING_FILE, 
     TRANSCRIPTION_FILE, 
@@ -16,7 +18,7 @@ from config import (
     WHISPER_MODEL_PATH,
     DIARIZATION_MODEL_PATH
 )
-from speaker_diarizer import SpeakerDiarizer
+from .speaker_diarizer import SpeakerDiarizer
 
 # Suppress specific warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio")
