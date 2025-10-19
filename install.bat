@@ -41,6 +41,17 @@ if errorlevel 1 (
 
 echo [SUCCESS] git found
 
+REM Check if git lfs is installed
+echo [INFO] Checking git lfs installation...
+git lfs version >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] git lfs is not installed. Please install git lfs from https://git-lfs.github.io
+    pause
+    exit /b 1
+)
+
+echo [SUCCESS] git lfs found
+
 REM Create virtual environment
 echo [INFO] Creating virtual environment...
 if exist "venv" (

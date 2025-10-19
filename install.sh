@@ -68,6 +68,18 @@ fi
 
 print_success "git found"
 
+# Check if git lfs is installed
+print_status "Checking git lfs installation..."
+if ! command -v git-lfs &> /dev/null; then
+    print_error "git lfs is not installed. Please install git lfs."
+    print_error "Linux: sudo apt install git-lfs (Ubuntu/Debian) or sudo yum install git-lfs (RHEL/CentOS)"
+    print_error "Mac: brew install git-lfs"
+    print_error "Windows: Download from https://git-lfs.github.io"
+    exit 1
+fi
+
+print_success "git lfs found"
+
 # Create virtual environment
 print_status "Creating virtual environment..."
 if [ -d "venv" ]; then

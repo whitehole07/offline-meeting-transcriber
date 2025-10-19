@@ -51,8 +51,8 @@ install.bat
 The installation script will automatically:
 - ✅ Create a virtual environment
 - ✅ Install all Python dependencies
-- ✅ Download Whisper model (~1.5GB) via git lfs
-- ✅ Download SpeechBrain speaker model (~100MB) via git lfs
+- ✅ Download Whisper model (~1.5GB) via git LFS
+- ✅ Download SpeechBrain speaker model (~100MB) via git LFS
 - ✅ Set up the complete environment
 - ✅ Test the installation
 
@@ -82,18 +82,41 @@ If you prefer to install manually:
    pip install -r requirements.txt
    ```
 
-4. **Download models** (first run will download automatically)
-   - Whisper model (~1.5GB)
-   - SpeechBrain speaker model (~100MB)
+4. **Download models**
+   - **Whisper Model**: `Systran/faster-whisper-medium` (~1.5GB)
+     - Speech-to-text transcription model
+     - Optimized for CPU inference
+     - Supports multiple languages
+   - **SpeechBrain Model**: `speechbrain/spkrec-ecapa-voxceleb` (~100MB)
+     - Speaker diarization model
+     - ECAPA-TDNN architecture
+     - Trained on VoxCeleb dataset
 
-#### 📋 **Installation Scripts**
+#### 📦 **Model Details & Manual Download**
 
-The repository includes automated installation scripts:
+If you need to download models manually or want to understand what they are:
 
-- **`install.sh`** - Linux/Mac installation script
-- **`install.bat`** - Windows installation script
+**Whisper Model (`Systran/faster-whisper-medium`)**:
+```bash
+# Download the Whisper model
+git clone https://huggingface.co/Systran/faster-whisper-medium models/faster-whisper-medium
+```
+- **Purpose**: Converts speech to text
+- **Architecture**: Transformer-based encoder-decoder
+- **Size**: ~1.5GB
+- **Languages**: 99 languages supported
+- **Optimization**: CPU-optimized version of OpenAI Whisper
 
-These scripts handle the complete setup process and are the recommended way to install the dependencies.
+**SpeechBrain Model (`speechbrain/spkrec-ecapa-voxceleb`)**:
+```bash
+# Download the speaker diarization model
+git clone https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb models/spkrec-ecapa-voxceleb
+```
+- **Purpose**: Identifies different speakers in audio
+- **Architecture**: ECAPA-TDNN (Extended Context Aggregation)
+- **Size**: ~100MB
+- **Training**: VoxCeleb dataset (1M+ utterances from 7K+ speakers)
+- **Features**: Speaker embedding extraction and clustering
 
 ### Usage
 
@@ -245,10 +268,13 @@ python -c "from faster_whisper import WhisperModel; WhisperModel('medium')"
 **Installation issues:**
 - Make sure you have Python 3.8+ installed
 - Ensure you have Git LFS installed (required for model downloads)
+  - **Linux/Mac**: `git lfs install` (after installing git-lfs package)
+  - **Windows**: Install Git LFS from https://git-lfs.github.io
 - Ensure you have internet connection for model downloads
 - If models fail to download, try running the installation script again
 - Check that you have sufficient disk space (~2GB for models)
 - On Windows, make sure you're running the batch file as administrator if needed
+- If git clone fails, try: `git lfs pull` in the model directories
 
 ### Platform-Specific Notes
 
