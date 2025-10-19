@@ -322,17 +322,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📊 Stats
 
-![GitHub stars](https://img.shields.io/github/stars/yourusername/offline-meeting-transcriber?style=social)
-![GitHub forks](https://img.shields.io/github/forks/yourusername/offline-meeting-transcriber?style=social)
-![GitHub issues](https://img.shields.io/github/issues/yourusername/offline-meeting-transcriber)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/yourusername/offline-meeting-transcriber)
+![GitHub stars](https://img.shields.io/github/stars/whitehole07/offline-meeting-transcriber?style=social)
+![GitHub forks](https://img.shields.io/github/forks/whitehole07/offline-meeting-transcriber?style=social)
+![GitHub issues](https://img.shields.io/github/issues/whitehole07/offline-meeting-transcriber)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/whitehole07/offline-meeting-transcriber)
 
 ---
 
 **⭐ Star this repository if you find it useful!**
 
-**🐛 Found a bug?** [Open an issue](https://github.com/yourusername/offline-meeting-transcriber/issues)
+**🐛 Found a bug?** [Open an issue](https://github.com/whitehole07/offline-meeting-transcriber/issues)
 
-**💡 Have a feature request?** [Start a discussion](https://github.com/yourusername/offline-meeting-transcriber/discussions)
-
-**📧 Questions?** [Contact us](mailto:your-email@example.com)
+**💡 Have a feature request?** [Start a discussion](https://github.com/whitehole07/offline-meeting-transcriber/discussions)
