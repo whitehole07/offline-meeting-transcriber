@@ -105,11 +105,15 @@ class SpeakerDiarizer:
         best_score = -1
         best_labels = None
         
+        try:
+            from sklearn.cluster import AgglomerativeClustering
+            from sklearn.metrics import silhouette_score
+        except Exception as e:
+            logger.error(f"Error importing clustering libraries: {e}")
+            return list(range(len(embeddings)))
+        
         for n_clusters in range(2, max_clusters + 1):
-            try:
-                from sklearn.cluster import AgglomerativeClustering
-                from sklearn.metrics import silhouette_score
-                
+            try:           
                 clustering = AgglomerativeClustering(
                     n_clusters=n_clusters,
                     linkage='average',
