@@ -8,7 +8,7 @@ import librosa
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import CHUNK_SIZE, RECORDING_FILE
-
+from .utils import get_system_default_monitor
 # Platform-specific imports
 # Windows: Use pyaudiowpatch for WASAPI loopback support
 # Linux: Use sounddevice for PulseAudio/PipeWire support
@@ -93,17 +93,13 @@ class AudioRecorder:
                         logging.warning("Make sure you have audio drivers installed and WASAPI-enabled Windows version")
             else:
                 # Linux: Check for available input devices (Speaker/default/pipewire)
-                devices = sd.query_devices()
-                found_device = False
-                for dev in devices:
-                    name_lower = dev['name'].lower()
-                    if dev['max_input_channels'] > 0 and ('speaker' in name_lower or 'default' in name_lower or 'pipewire' in name_lower):
-                        found_device = True
-                        logging.info(f"Found system audio device: {dev['name']}")
-                        break
-                if not found_device:
-                    logging.warning("No suitable audio input device found")
+                monitor_device = get_system_default_monitor()
+                if monitor_device:
+                    logging.info(f"System default monitor: {monitor_device}")
+                else:
+                    logging.warning("No system default monitor found")
                     logging.warning("Make sure PulseAudio/PipeWire is running")
+                    raise RuntimeError("No system default monitor found")
         except Exception as e:
             logging.warning(f"Could not check system audio: {e}")
     
@@ -171,27 +167,27 @@ class AudioRecorder:
                 # Linux: Use sounddevice with speaker device for loopback
                 # Note: Direct monitor devices aren't visible through ALSA API
                 # We'll use the Speaker device which PipeWire can loop back
+                # Query all devices
+                # TODO: replace with pulseaudio or pipewire native methods (see pulseaudio_loopback in utils)
                 devices = sd.query_devices()
                 system_device = None
                 system_index = None
-                
-                # Try to find Speaker device (which has input channels via PipeWire loopback)
+
+                # Use the default device directly
                 for idx, dev in enumerate(devices):
-                    name_lower = dev['name'].lower()
-                    if dev['max_input_channels'] > 0 and 'speaker' in name_lower:
+                    if dev['name'].lower() == 'default' and dev['max_input_channels'] > 0:
                         system_device = dev
                         system_index = idx
                         logging.info(f"Using system audio device: {dev['name']}")
                         break
-                
-                # Fallback to default or pipewire device
+
+                # Fallback: use the first input device with >0 channels
                 if not system_device:
                     for idx, dev in enumerate(devices):
-                        name_lower = dev['name'].lower()
-                        if dev['max_input_channels'] > 0 and ('default' in name_lower or 'pipewire' in name_lower):
+                        if dev['max_input_channels'] > 0:
                             system_device = dev
                             system_index = idx
-                            logging.info(f"Using system audio device: {dev['name']}")
+                            logging.info(f"Using fallback system audio device: {dev['name']}")
                             break
                 
                 if not system_device:

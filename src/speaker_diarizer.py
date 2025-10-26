@@ -84,7 +84,14 @@ class SpeakerDiarizer:
         try:
             with torch.no_grad():
                 embedding = self.embedding_model.encode_batch(torch.tensor(audio).unsqueeze(0))
-                return embedding.squeeze().numpy()
+                embedding = embedding.squeeze().numpy()
+                
+                # Normalize the embedding
+                norm = np.linalg.norm(embedding)
+                if norm > 0:
+                    embedding = embedding / norm
+                
+                return embedding
         except Exception as e:
             logger.error(f"Error getting embedding: {e}")
             return None
@@ -94,7 +101,7 @@ class SpeakerDiarizer:
         if len(embeddings) <= 3:
             return list(range(len(embeddings)))
         
-        max_clusters = min(6, len(embeddings))
+        max_clusters = min(10, len(embeddings))
         best_score = -1
         best_labels = None
         
