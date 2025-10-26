@@ -35,7 +35,7 @@ Transform your meetings into searchable, speaker-labeled transcripts without sen
 
 **Linux/Mac:**
 ```bash
-git clone https://github.com/yourusername/offline-meeting-transcriber.git
+git clone https://github.com/whitehole07/offline-meeting-transcriber.git
 cd offline-meeting-transcriber
 chmod +x install.sh
 ./install.sh
@@ -43,7 +43,7 @@ chmod +x install.sh
 
 **Windows:**
 ```cmd
-git clone https://github.com/yourusername/offline-meeting-transcriber.git
+git clone https://github.com/whitehole07/offline-meeting-transcriber.git
 cd offline-meeting-transcriber
 install.bat
 ```
@@ -62,7 +62,7 @@ If you prefer to install manually:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/offline-meeting-transcriber.git
+   git clone https://github.com/whitehole07/offline-meeting-transcriber.git
    cd offline-meeting-transcriber
    ```
 
@@ -131,11 +131,6 @@ python cli.py start --no-mic
 
 #### Stop Recording & Process
 Press `Ctrl+C` to stop recording and automatically process the audio.
-
-#### Windows Users
-Double-click `meeting-agent.bat` for easy startup.
-
-**Note:** The recording will automatically stop and process when you press `Ctrl+C`.
 
 ## 📁 Output Files
 
