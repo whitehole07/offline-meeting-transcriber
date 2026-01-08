@@ -1,26 +1,26 @@
-# 🎙️ Offline Meeting Transcriber
+# Offline Meeting Transcriber
 
-> **Privacy-first, AI-powered meeting transcription with speaker diarization - completely offline**
+> Privacy-first, AI-powered meeting transcription with speaker diarization, completely offline!
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Offline](https://img.shields.io/badge/Offline-100%25-red.svg)](#privacy-first)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)](#cross-platform)
+[![Offline](https://img.shields.io/badge/Offline-100%25-red.svg)](#privacy-and-security)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)](#platform-specific-notes)
 
 Transform your meetings into searchable, speaker-labeled transcripts without sending any data to the cloud. This tool combines advanced speech recognition with speaker diarization to create professional meeting records.
 
-## ✨ Features
+## Features
 
-- 🎯 **100% Offline** - No internet required, complete privacy
-- 🎙️ **Dual Audio Capture** - Records both microphone and system audio
-- 🗣️ **Speaker Diarization** - Automatically identifies different speakers
-- 🌍 **Multi-language Support** - Configurable language detection
-- 💻 **Cross-platform** - Works on Windows and Linux
-- ⚡ **Fast Processing** - Optimized for CPU inference
-- 📝 **Multiple Output Formats** - Plain text and speaker-labeled transcripts
-- 🔧 **Easy Setup** - Simple CLI interface
+- **100% Offline** - No internet required, complete privacy
+- **Dual Audio Capture** - Records both microphone and system audio
+- **Speaker Diarization** - Automatically identifies different speakers
+- **Multi-language Support** - Configurable language detection
+- **Cross-platform** - Works on Windows and Linux
+- **Fast Processing** - Optimized for CPU inference
+- **Multiple Output Formats** - Plain text and speaker-labeled transcripts
+- **Easy Setup** - Simple CLI interface
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -31,7 +31,7 @@ Transform your meetings into searchable, speaker-labeled transcripts without sen
 
 ### Installation
 
-#### 🚀 **Quick Install (Recommended)**
+#### Quick Install (Recommended)
 
 **Linux/Mac:**
 ```bash
@@ -49,14 +49,14 @@ install.bat
 ```
 
 The installation script will automatically:
-- ✅ Create a virtual environment
-- ✅ Install all Python dependencies
-- ✅ Download Whisper model (~1.5GB) via git LFS
-- ✅ Download SpeechBrain speaker model (~100MB) via git LFS
-- ✅ Set up the complete environment
-- ✅ Test the installation
+- Create a virtual environment
+- Install all Python dependencies
+- Download Whisper model (~1.5GB) via git LFS
+- Download SpeechBrain speaker model (~100MB) via git LFS
+- Set up the complete environment
+- Test the installation
 
-#### 🔧 **Manual Installation**
+#### Manual Installation
 
 If you prefer to install manually:
 
@@ -92,13 +92,12 @@ If you prefer to install manually:
      - ECAPA-TDNN architecture
      - Trained on VoxCeleb dataset
 
-#### 📦 **Model Details & Manual Download**
+#### Model Details and Manual Download
 
-If you need to download models manually or want to understand what they are:
+If you need to download models manually:
 
 **Whisper Model (`Systran/faster-whisper-medium`)**:
 ```bash
-# Download the Whisper model
 git clone https://huggingface.co/Systran/faster-whisper-medium models/faster-whisper-medium
 ```
 - **Purpose**: Converts speech to text
@@ -109,7 +108,6 @@ git clone https://huggingface.co/Systran/faster-whisper-medium models/faster-whi
 
 **SpeechBrain Model (`speechbrain/spkrec-ecapa-voxceleb`)**:
 ```bash
-# Download the speaker diarization model
 git clone https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb models/spkrec-ecapa-voxceleb
 ```
 - **Purpose**: Identifies different speakers in audio
@@ -129,10 +127,10 @@ python cli.py start
 python cli.py start --no-mic
 ```
 
-#### Stop Recording & Process
+#### Stop Recording and Process
 Press `Ctrl+C` to stop recording and automatically process the audio.
 
-## 📁 Output Files
+## Output Files
 
 After processing, you'll find these files in `output/YYYYMMDD/`:
 
@@ -154,99 +152,19 @@ SPEAKER_01 (00:00-01:10): When you become fascist or communist or anarchist in t
 SPEAKER_00 (01:10-02:14): We're not doing that well, no we're not doing that well guys, if it goes well you make me laugh...
 ```
 
-## 🏗️ Architecture
-
-```mermaid
-graph TD
-    A[Audio Input] --> B[Dual Stream Recording]
-    B --> C[Audio Synchronization]
-    C --> D[Whisper Transcription]
-    D --> E[Speaker Embedding]
-    E --> F[Clustering Algorithm]
-    F --> G[Speaker Diarization]
-    G --> H[Output Generation]
-    
-    I[Microphone] --> B
-    J[System Audio] --> B
-```
-
-### Core Components
-
-- **Audio Recorder** (`src/recorder.py`) - Cross-platform dual-stream audio capture
-- **Whisper Engine** (`src/transcriber.py`) - Offline speech-to-text transcription
-- **Speaker Diarizer** (`src/speaker_diarizer.py`) - AI-powered speaker identification
-- **CLI Interface** (`cli.py`) - User-friendly command-line tool
-
-## 🔧 Configuration
+## Configuration
 
 Edit `config.py` to customize:
 
 ```python
-# Audio settings
-SAMPLE_RATE = 16000
-CHUNK_SIZE = 1024
-
-# Whisper settings
 WHISPER_MODEL = "medium"  # base, small, medium, large
 WHISPER_LANGUAGE = "en"   # Language code
-
-# Model paths
-WHISPER_MODEL_PATH = "./models/faster-whisper-medium/"
-DIARIZATION_MODEL_PATH = "./models/spkrec-ecapa-voxceleb/"
 ```
 
-## 🎯 Use Cases
-
-- **Business Meetings** - Professional meeting documentation
-- **Interviews** - Speaker identification for interviews
-- **Lectures** - Educational content transcription
-- **Podcasts** - Multi-speaker content analysis
-- **Accessibility** - Automated transcription with speaker labels
-- **Research** - Academic meeting analysis
-
-## 🛠️ Technical Details
-
-### Audio Processing
-- **Sample Rate**: 16kHz (optimized for speech)
-- **Format**: 16-bit WAV
-- **Channels**: Mono (stereo converted to mono)
-- **Mixing**: 50/50 blend of microphone and system audio
-
-### AI Models
-- **Transcription**: OpenAI Whisper (faster-whisper implementation)
-- **Speaker Diarization**: SpeechBrain ECAPA-TDNN embeddings
-- **Clustering**: Agglomerative clustering with silhouette scoring
-
-### Performance
-- **CPU Only**: No GPU required
-- **Memory**: ~2GB RAM usage
-- **Speed**: Real-time recording, ~2x processing time
-- **Accuracy**: High accuracy for clear speech
-
-## 🔒 Privacy & Security
-
-- ✅ **100% Offline** - No data leaves your device
-- ✅ **No Cloud Dependencies** - All processing local
-- ✅ **No Internet Required** - Works in air-gapped environments
-- ✅ **Open Source** - Transparent code, auditable
-- ✅ **Local Models** - No external API calls
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**No audio devices found:**
-```bash
-# Linux - Check PulseAudio
-pulseaudio --check
-
-# Windows - Check audio drivers
-# Ensure WASAPI is enabled
-```
+## Troubleshooting
 
 **Model download fails:**
 ```bash
-# Manual model download
 python -c "from faster_whisper import WhisperModel; WhisperModel('medium')"
 ```
 
@@ -283,39 +201,18 @@ python -c "from faster_whisper import WhisperModel; WhisperModel('medium')"
 - May need additional audio packages
 - Check device permissions
 
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-### Development Setup
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-### Areas for Contribution
-
-- Additional language support
-- GUI interface
-- Mobile app
-- Cloud integration (optional)
-- Performance optimizations
-- Documentation improvements
-
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [OpenAI Whisper](https://github.com/openai/whisper) - Speech recognition
 - [SpeechBrain](https://speechbrain.github.io/) - Speaker diarization
 - [faster-whisper](https://github.com/guillaumekln/faster-whisper) - Optimized Whisper implementation
 - [PyAudio](https://people.csail.mit.edu/hubert/pyaudio/) - Audio I/O
 
-## 📊 Stats
+## Project Stats
 
 ![GitHub stars](https://img.shields.io/github/stars/whitehole07/offline-meeting-transcriber?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/whitehole07/offline-meeting-transcriber?style=social)
@@ -324,8 +221,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**⭐ Star this repository if you find it useful!**
+**Found a bug?** [Open an issue](https://github.com/whitehole07/offline-meeting-transcriber/issues)
 
-**🐛 Found a bug?** [Open an issue](https://github.com/whitehole07/offline-meeting-transcriber/issues)
-
-**💡 Have a feature request?** [Start a discussion](https://github.com/whitehole07/offline-meeting-transcriber/discussions)
+**Have a feature request?** [Start a discussion](https://github.com/whitehole07/offline-meeting-transcriber/discussions)

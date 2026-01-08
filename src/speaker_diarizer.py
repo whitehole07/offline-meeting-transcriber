@@ -126,7 +126,7 @@ class SpeakerDiarizer:
                     best_score = score
                     best_labels = labels
                     
-            except Exception as e:
+            except Exception as e:  
                 logger.warning(f"Clustering failed for {n_clusters} clusters: {e}")
                 continue
         
