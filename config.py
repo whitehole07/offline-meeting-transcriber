@@ -20,7 +20,7 @@ RECORDING_FORMAT = "wav"
 
 # Whisper transcription settings
 WHISPER_MODEL = "medium"     # Options: base, small, medium, large
-WHISPER_LANGUAGE = "it"      # Language code for transcription
+WHISPER_LANGUAGE = "en"      # Language code for transcription
 WHISPER_MODEL_PATH = f"./models/faster-whisper-{WHISPER_MODEL}/"  # Local model path
 DIARIZATION_MODEL_PATH = "./models/spkrec-ecapa-voxceleb/"  # SpeechBrain speaker embedding model path
 
