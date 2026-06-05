@@ -9,9 +9,9 @@ load_dotenv()
 # Project paths
 PROJECT_ROOT = Path(__file__).parent
 OUTPUT_DIR = PROJECT_ROOT / "output" / datetime.now().strftime("%Y%m%d")
-RECORDING_FILE = OUTPUT_DIR / f"recording_{datetime.now().strftime('%H%M%S')}.wav"
-TRANSCRIPTION_FILE = OUTPUT_DIR / f"transcription_{datetime.now().strftime('%H%M%S')}.txt"
-DIARIZED_FILE = OUTPUT_DIR / f"diarized_{datetime.now().strftime('%H%M%S')}.json"
+RECORDING_FILE = OUTPUT_DIR / f"recording_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
+TRANSCRIPTION_FILE = OUTPUT_DIR / f"transcription_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+DIARIZED_FILE = OUTPUT_DIR / f"diarized_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
 # Audio settings
 SAMPLE_RATE = 16000  # Default sample rate for audio processing
@@ -23,7 +23,6 @@ WHISPER_MODEL = "medium"     # Options: base, small, medium, large
 WHISPER_LANGUAGE = "en"      # Language code for transcription
 WHISPER_MODEL_PATH = f"./models/faster-whisper-{WHISPER_MODEL}/"  # Local model path
 DIARIZATION_MODEL_PATH = "./models/spkrec-ecapa-voxceleb/"  # SpeechBrain speaker embedding model path
-
 
 # Create output directory
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

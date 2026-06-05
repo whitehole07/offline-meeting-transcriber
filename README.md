@@ -134,9 +134,9 @@ Press `Ctrl+C` to stop recording and automatically process the audio.
 
 After processing, you'll find these files in `output/YYYYMMDD/`:
 
-- `recording_HHMMSS.wav` - Original audio recording
-- `transcription_HHMMSS.txt` - Plain text transcription
-- `diarized_HHMMSS.txt` - Speaker-labeled transcription
+- `recording_YYYYMMDD_HHMMSS.wav` - Original audio recording
+- `transcription_YYYYMMDD_HHMMSS.txt` - Plain text transcription
+- `diarized_YYYYMMDD_HHMMSS.txt` - Speaker-labeled transcription
 
 ### Example Output
 
