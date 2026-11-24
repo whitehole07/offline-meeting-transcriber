@@ -8,7 +8,7 @@ import librosa
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import CHUNK_SIZE, RECORDING_FILE
-from .utils import get_system_default_monitor
+from .utils import get_system_default_monitor, start_pulseaudio_loopback
 # Platform-specific imports
 # Windows: Use pyaudiowpatch for WASAPI loopback support
 # Linux: Use sounddevice for PulseAudio/PipeWire support
@@ -122,6 +122,11 @@ class AudioRecorder:
             # sounddevice returns numpy array directly
             self.sys_audio_data.append(indata.copy())
     
+    def _sys_audio_callback_parec(self, chunk):
+        """Callback for system audio (parec on Linux): int16 frames x channels"""
+        if self.is_recording:
+            self.sys_audio_data.append(chunk.copy())
+
     def _mic_audio_callback_pyaudio(self, indata, frame_count, time_info, status):
         """Callback for microphone audio (PyAudio on Windows)"""
         if self.is_recording:
@@ -164,49 +169,17 @@ class AudioRecorder:
                 )
                 self.sys_stream.start_stream()
             else:
-                # Linux: Use sounddevice with speaker device for loopback
-                # Note: Direct monitor devices aren't visible through ALSA API
-                # We'll use the Speaker device which PipeWire can loop back
-                # Query all devices
-                # TODO: replace with pulseaudio or pipewire native methods (see pulseaudio_loopback in utils)
-                devices = sd.query_devices()
-                system_device = None
-                system_index = None
-
-                # Use the default device directly
-                for idx, dev in enumerate(devices):
-                    if dev['name'].lower() == 'default' and dev['max_input_channels'] > 0:
-                        system_device = dev
-                        system_index = idx
-                        logging.info(f"Using system audio device: {dev['name']}")
-                        break
-
-                # Fallback: use the first input device with >0 channels
-                if not system_device:
-                    for idx, dev in enumerate(devices):
-                        if dev['max_input_channels'] > 0:
-                            system_device = dev
-                            system_index = idx
-                            logging.info(f"Using fallback system audio device: {dev['name']}")
-                            break
-                
-                if not system_device:
-                    raise RuntimeError("No suitable audio device found for system audio recording")
-                
-                # Start sounddevice input stream
-                self.sys_channels = min(2, system_device['max_input_channels'])
-                
+                # Linux: record the default output's monitor (what you hear) through
+                # PulseAudio/PipeWire. The ALSA "default" input is the microphone, so
+                # opening it here would record the mic a second time.
+                self.sys_channels = 1  # parec downmixes to mono
                 logging.info(f"System audio: {self.sys_sample_rate} Hz, {self.sys_channels} channel(s)")
-                
-                self.sys_stream = sd.InputStream(
-                    device=system_index,
+                self.sys_stream, _ = start_pulseaudio_loopback(
+                    self._sys_audio_callback_parec,
+                    sample_rate=self.sys_sample_rate,
                     channels=self.sys_channels,
-                    samplerate=self.sys_sample_rate,
-                    dtype=np.int16,
-                    callback=self._sys_audio_callback_sd,
-                    blocksize=CHUNK_SIZE
+                    chunk_size=CHUNK_SIZE,
                 )
-                self.sys_stream.start()
                 
         except Exception as e:
             logging.warning(f"Could not start system audio recording: {e}")
@@ -272,8 +245,9 @@ class AudioRecorder:
                 self.sys_stream.stop_stream()
                 self.sys_stream.close()
             else:
-                self.sys_stream.stop()
-                self.sys_stream.close()
+                # The parec process: stopping it ends its reader thread.
+                self.sys_stream.terminate()
+                self.sys_stream.wait(timeout=2)
 
         # Give any last callback a moment to finish pushing frames
         time.sleep(0.05)

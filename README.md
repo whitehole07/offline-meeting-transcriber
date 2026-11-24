@@ -158,7 +158,7 @@ Edit `config.py` to customize:
 
 ```python
 WHISPER_MODEL = "medium"  # base, small, medium, large
-WHISPER_LANGUAGE = "en"   # Language code
+WHISPER_LANGUAGE = None   # Detected from the audio; set WHISPER_LANGUAGE=it (or en) in .env to force one
 ```
 
 ## Troubleshooting

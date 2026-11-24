@@ -86,7 +86,9 @@ def start_pulseaudio_loopback(callback, sample_rate=44100, channels=2, chunk_siz
         "--format=s16le",
         f"--rate={sample_rate}",
         f"--channels={channels}",
-        monitor_name
+        f"--device={monitor_name}",
+        # A short buffer: parec otherwise holds ~1.5 s back, lost when it is stopped.
+        "--latency-msec=50",
     ]
     parec_proc = subprocess.Popen(parec_cmd, stdout=subprocess.PIPE)
 
